@@ -2458,7 +2458,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       )}
 
       {/* Presentation Mode Overlay */}
-      {presenting && <PresentationMode nodes={nodes} onExit={() => setPresenting(false)} />}
+      {presenting && <PresentationMode nodes={nodes} onExit={() => setPresenting(false)} nodeNotes={nodeNotes} onNotesChange={handleNotesChange} />}
     </>
   );
 }
@@ -2466,9 +2466,10 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
 /* ═══════════════════════════════════════════════════════════════════════
    PRESENTATION MODE — spotlight walkthrough of flow steps
    ═══════════════════════════════════════════════════════════════════════ */
-function PresentationMode({ nodes, onExit }) {
+function PresentationMode({ nodes, onExit, nodeNotes, onNotesChange }) {
   // Filter to only stage-type nodes (skip grid, notes, bubbles)
   const steps = useMemo(() => nodes.filter((n) => n.type === 'stage'), [nodes]);
+  const [editingNotes, setEditingNotes] = useState(false);
   const [idx, setIdx] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [speed, setSpeed] = useState(8);
@@ -2478,6 +2479,10 @@ function PresentationMode({ nodes, onExit }) {
   const step = steps[idx] || {};
   const prevStep = steps[idx - 1];
   const nextStep = steps[idx + 1];
+  const currentNotes = (nodeNotes && step.id) ? (nodeNotes[step.id] || '') : '';
+
+  // Reset editing state when navigating
+  useEffect(() => { setEditingNotes(false); }, [idx]);
 
   // Auto-play timer
   useEffect(() => {
@@ -2491,6 +2496,8 @@ function PresentationMode({ nodes, onExit }) {
   // Keyboard navigation
   useEffect(() => {
     const handler = (e) => {
+      // Don't intercept keys when typing in notes textarea
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(i + 1, steps.length - 1)); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
       else if (e.key === ' ') { e.preventDefault(); setAutoPlay((p) => !p); }
@@ -2618,8 +2625,8 @@ function PresentationMode({ nodes, onExit }) {
         {renderCard(nextStep, 0.8, 0.25)}
       </div>
 
-      {/* Speaker notes */}
-      <div style={{ padding: '16px 40px 20px', maxHeight: '30vh', overflow: 'auto' }}>
+      {/* Speaker notes + editable notes */}
+      <div style={{ padding: '16px 40px 20px', maxHeight: '35vh', overflow: 'auto' }}>
         <div style={{
           background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12,
           padding: '16px 24px', maxWidth: 700, margin: '0 auto',
@@ -2638,6 +2645,58 @@ function PresentationMode({ nodes, onExit }) {
                   {detail.items ? detail.items.join(' · ') : ''}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Editable notes */}
+          {onNotesChange && (
+            <div style={{ marginTop: 14, borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: `${d.accentColor || colors.blue}99` }}>
+                  Your Notes
+                </span>
+                {!editingNotes && (
+                  <button
+                    onClick={() => setEditingNotes(true)}
+                    style={{
+                      background: 'none', border: `1px solid ${colors.border}`, borderRadius: 6,
+                      cursor: 'pointer', fontSize: 11, color: colors.textDim, padding: '3px 10px',
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  >
+                    {currentNotes ? '✎ Edit' : '+ Add Note'}
+                  </button>
+                )}
+              </div>
+              {editingNotes ? (
+                <div>
+                  <textarea
+                    autoFocus
+                    defaultValue={currentNotes}
+                    onBlur={(e) => { onNotesChange(step.id, e.target.value); setEditingNotes(false); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { onNotesChange(step.id, e.target.value); setEditingNotes(false); }
+                    }}
+                    style={{
+                      width: '100%', minHeight: 70, maxHeight: 150, background: `${colors.bg}88`,
+                      border: `1px solid ${colors.border}`, borderRadius: 8,
+                      outline: 'none', resize: 'vertical', fontFamily: "'Inter', sans-serif",
+                      fontSize: 13, lineHeight: 1.6, color: colors.text, padding: '8px 12px',
+                    }}
+                    placeholder="Add notes for this step..."
+                  />
+                  <div style={{ fontSize: 10, color: colors.textDim, marginTop: 4 }}>
+                    Click outside or press Esc to save
+                  </div>
+                </div>
+              ) : currentNotes ? (
+                <div
+                  onDoubleClick={() => setEditingNotes(true)}
+                  style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.6, whiteSpace: 'pre-wrap', cursor: 'text' }}
+                >
+                  {currentNotes}
+                </div>
+              ) : null}
             </div>
           )}
         </div>
