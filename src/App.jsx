@@ -381,16 +381,18 @@ function StickyNote({ id, data }) {
       }}
     >
       {/* toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: `1px solid ${colorScheme.border}40`, cursor: 'grab' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: `1px solid ${colorScheme.border}40`, cursor: data._editMode ? 'grab' : 'default' }}>
         <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: `${colorScheme.text}99` }}>Note</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={cycleColor} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', color: colorScheme.text, opacity: 0.6 }} title="Change color">
-            🎨
-          </button>
-          <button onClick={handleDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', color: colorScheme.text, opacity: 0.6 }} title="Delete note">
-            ✕
-          </button>
-        </div>
+        {data._editMode && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={cycleColor} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', color: colorScheme.text, opacity: 0.6 }} title="Change color">
+              🎨
+            </button>
+            <button onClick={handleDelete} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', color: colorScheme.text, opacity: 0.6 }} title="Delete note">
+              ✕
+            </button>
+          </div>
+        )}
       </div>
       {/* body */}
       <div style={{ padding: '6px 10px 10px' }}>
@@ -2030,6 +2032,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const [showAddModal, setShowAddModal] = useState(false);
   const [insertEdgeCtx, setInsertEdgeCtx] = useState(null); // { edgeId, sourceId, targetId }
   const [presenting, setPresenting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   // ── Sticky notes (persisted in localStorage per viewId) ──
   const storageKey = `flowchart-notes-${viewId || 'default'}`;
@@ -2147,9 +2150,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         ...nd.data,
         _expanded: expandedSet.has(nd.id),
         _onToggle: onToggle,
-        _onDelete: handleDeleteNode,
-        _onResize: handleResizeNode,
-        _onResizeWidth: handleResizeWidth,
+        ...(editMode ? { _onDelete: handleDeleteNode, _onResize: handleResizeNode, _onResizeWidth: handleResizeWidth } : {}),
         _customHeight: nd._originalBaseHeight ? nd.baseHeight : undefined,
         _baseHeight: nd.baseHeight || nd._spanHeight || 150,
         _customWidth: nd.baseWidth || undefined,
@@ -2160,6 +2161,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         type: 'stage',
         position: pos,
         data: nodeData,
+        draggable: editMode,
       };
     }));
 
@@ -2174,13 +2176,12 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         id: sideNode.id,
         type: 'stage',
         position: sidePos,
+        draggable: editMode,
         data: {
           ...sideNode.data,
           _expanded: expandedSet.has(sideNode.id),
           _onToggle: onToggle,
-          _onDelete: handleDeleteNode,
-          _onResize: handleResizeNode,
-          _onResizeWidth: handleResizeWidth,
+          ...(editMode ? { _onDelete: handleDeleteNode, _onResize: handleResizeNode, _onResizeWidth: handleResizeWidth } : {}),
           _baseHeight: 150,
         },
       });
@@ -2218,16 +2219,17 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           text: note.text,
           colorIndex: note.colorIndex,
           rotation: note.rotation,
-          onUpdate: updateNoteText,
-          onDelete: deleteNote,
-          onCycleColor: cycleNoteColor,
+          _editMode: editMode,
+          onUpdate: editMode ? updateNoteText : undefined,
+          onDelete: editMode ? deleteNote : undefined,
+          onCycleColor: editMode ? cycleNoteColor : undefined,
         },
-        draggable: true,
+        draggable: editMode,
       });
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, weekGrid]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, weekGrid, editMode]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -2300,7 +2302,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         edges={edges}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
-        onEdgeClick={handleEdgeClick}
+        onEdgeClick={editMode ? handleEdgeClick : undefined}
         nodeTypes={nodeTypes}
         snapToGrid
         snapGrid={snapGridY ? [20, 1] : [20, 50]}
@@ -2316,16 +2318,28 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         <MiniMap nodeColor={() => colors.surface} maskColor={`${colors.bg}cc`} position="bottom-right" style={{ marginBottom: 48 }} />
       </ReactFlow>
 
-      {/* Editor toolbar */}
+      {/* View/Edit toolbar */}
       <div className="editor-toolbar">
-        <button onClick={addNote} className="toolbar-btn" title="Add a sticky note">+ Note</button>
-        <button onClick={() => { setInsertEdgeCtx(null); setShowAddModal(true); }} className="toolbar-btn toolbar-btn-primary" title="Add a new step to the flow">+ Step</button>
+        <button
+          onClick={() => setEditMode((m) => !m)}
+          className={`toolbar-btn ${editMode ? 'toolbar-btn-active' : ''}`}
+          title={editMode ? 'Switch to view mode' : 'Switch to edit mode'}
+          style={editMode ? { borderColor: colors.amber, color: colors.amber } : {}}
+        >
+          {editMode ? '✎ Editing' : '✎ Edit'}
+        </button>
         <button onClick={() => setPresenting(true)} className="toolbar-btn" title="Start presentation walkthrough" style={{ borderColor: '#a78bfa', color: '#a78bfa' }}>&#9654; Present</button>
-        {hasDragChanges && (
-          <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
-        )}
-        {(editorHasEdits || hasDragChanges) && (
-          <button onClick={() => { editorReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
+        {editMode && (
+          <>
+            <button onClick={addNote} className="toolbar-btn" title="Add a sticky note">+ Note</button>
+            <button onClick={() => { setInsertEdgeCtx(null); setShowAddModal(true); }} className="toolbar-btn toolbar-btn-primary" title="Add a new step to the flow">+ Step</button>
+            {hasDragChanges && (
+              <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
+            )}
+            {(editorHasEdits || hasDragChanges) && (
+              <button onClick={() => { editorReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
+            )}
+          </>
         )}
       </div>
 
@@ -2653,6 +2667,9 @@ const globalCSS = `
   }
   .toolbar-btn-danger:hover {
     background: ${colors.rose}22; color: ${colors.rose}; border-color: ${colors.rose};
+  }
+  .toolbar-btn-active {
+    background: ${colors.amber}18; box-shadow: 0 0 12px ${colors.amber}33, 0 2px 8px rgba(0,0,0,0.3);
   }
   .react-flow__edge { cursor: pointer; }
   .react-flow__edge:hover .react-flow__edge-path { stroke-width: 4 !important; }
