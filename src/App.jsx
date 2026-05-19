@@ -2029,6 +2029,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const { nodes: editorNodes, edges: editorEdges, addNode: editorAddNode, deleteNode: editorDeleteNode, updateNodeHeight: editorUpdateHeight, updateNodeWidth: editorUpdateWidth, resetAll: editorReset, hasEdits: editorHasEdits } = editor;
   const [showAddModal, setShowAddModal] = useState(false);
   const [insertEdgeCtx, setInsertEdgeCtx] = useState(null); // { edgeId, sourceId, targetId }
+  const [presenting, setPresenting] = useState(false);
 
   // ── Sticky notes (persisted in localStorage per viewId) ──
   const storageKey = `flowchart-notes-${viewId || 'default'}`;
@@ -2247,35 +2248,46 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     setEdges(allEdges);
   }, [allEdges, setEdges]);
 
+  // Track which nodes the user is actively dragging (to ignore programmatic position changes)
+  const activeDrags = useRef(new Set());
+
   // Capture drag offsets when user drags nodes
   const handleNodesChange = useCallback((changes) => {
     onNodesChange(changes);
 
     for (const change of changes) {
-      if (change.type === 'position' && change.dragging === false && change.position) {
-        const noteMatch = stickyNotes.find((n) => n.id === change.id);
-        if (noteMatch) {
-          setStickyNotes((prev) => prev.map((n) =>
-            n.id === change.id ? { ...n, x: change.position.x, y: change.position.y } : n
-          ));
-          dragOffsets.current[change.id] = { x: 0, y: 0 };
-          continue;
+      if (change.type === 'position' && change.position) {
+        // Track when a real user drag starts
+        if (change.dragging === true) {
+          activeDrags.current.add(change.id);
         }
+        // Only store offset on drag END for nodes the user actually dragged
+        if (change.dragging === false && activeDrags.current.has(change.id)) {
+          activeDrags.current.delete(change.id);
 
-        const nd = positioned.find((n) => n.id === change.id);
-        if (nd || (sideNode && change.id === sideNode.id)) {
-          // Store absolute position so it survives base-position recalculations
-          const finalY = snapGridY
-            ? Math.round(change.position.y / snapGridY) * snapGridY
-            : change.position.y;
-          dragOffsets.current[change.id] = {
-            x: change.position.x,
-            y: finalY,
-            abs: true,
-          };
-          setHasDragChanges(true);
-        } else {
-          dragOffsets.current[change.id] = { x: 0, y: 0 };
+          const noteMatch = stickyNotes.find((n) => n.id === change.id);
+          if (noteMatch) {
+            setStickyNotes((prev) => prev.map((n) =>
+              n.id === change.id ? { ...n, x: change.position.x, y: change.position.y } : n
+            ));
+            dragOffsets.current[change.id] = { x: 0, y: 0 };
+            continue;
+          }
+
+          const nd = positioned.find((n) => n.id === change.id);
+          if (nd || (sideNode && change.id === sideNode.id)) {
+            const finalY = snapGridY
+              ? Math.round(change.position.y / snapGridY) * snapGridY
+              : change.position.y;
+            dragOffsets.current[change.id] = {
+              x: change.position.x,
+              y: finalY,
+              abs: true,
+            };
+            setHasDragChanges(true);
+          } else {
+            dragOffsets.current[change.id] = { x: 0, y: 0 };
+          }
         }
       }
     }
@@ -2308,6 +2320,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       <div className="editor-toolbar">
         <button onClick={addNote} className="toolbar-btn" title="Add a sticky note">+ Note</button>
         <button onClick={() => { setInsertEdgeCtx(null); setShowAddModal(true); }} className="toolbar-btn toolbar-btn-primary" title="Add a new step to the flow">+ Step</button>
+        <button onClick={() => setPresenting(true)} className="toolbar-btn" title="Start presentation walkthrough" style={{ borderColor: '#a78bfa', color: '#a78bfa' }}>&#9654; Present</button>
         {hasDragChanges && (
           <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
         )}
@@ -2323,7 +2336,222 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           onCancel={() => { setShowAddModal(false); setInsertEdgeCtx(null); }}
         />
       )}
+
+      {/* Presentation Mode Overlay */}
+      {presenting && <PresentationMode nodes={nodes} onExit={() => setPresenting(false)} />}
     </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRESENTATION MODE — spotlight walkthrough of flow steps
+   ═══════════════════════════════════════════════════════════════════════ */
+function PresentationMode({ nodes, onExit }) {
+  // Filter to only stage-type nodes (skip grid, notes, bubbles)
+  const steps = useMemo(() => nodes.filter((n) => n.type === 'stage'), [nodes]);
+  const [idx, setIdx] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [speed, setSpeed] = useState(8);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
+
+  const step = steps[idx] || {};
+  const prevStep = steps[idx - 1];
+  const nextStep = steps[idx + 1];
+
+  // Auto-play timer
+  useEffect(() => {
+    if (!autoPlay) return;
+    const timer = setInterval(() => {
+      setIdx((i) => (i < steps.length - 1 ? i + 1 : (setAutoPlay(false), i)));
+    }, speed * 1000);
+    return () => clearInterval(timer);
+  }, [autoPlay, speed, steps.length]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(i + 1, steps.length - 1)); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
+      else if (e.key === ' ') { e.preventDefault(); setAutoPlay((p) => !p); }
+      else if (e.key === 'Escape') { if (isFullscreen) { document.exitFullscreen?.(); setIsFullscreen(false); } else onExit(); }
+      else if (e.key === 'f' || e.key === 'F') {
+        if (!isFullscreen) { containerRef.current?.requestFullscreen?.(); setIsFullscreen(true); }
+        else { document.exitFullscreen?.(); setIsFullscreen(false); }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [steps.length, onExit, isFullscreen]);
+
+  // Listen for fullscreen exit via ESC (browser native)
+  useEffect(() => {
+    const handler = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  const renderCard = (nodeData, scale, opacity) => {
+    if (!nodeData) return null;
+    const d = nodeData.data || {};
+    const accent = d.accentColor || colors.blue;
+    const glow = d.glowColor || `${accent}15`;
+    return (
+      <div style={{
+        width: scale > 0.9 ? 340 : 220, transform: `scale(${scale})`, opacity,
+        background: colors.surface, border: `1.5px solid ${scale > 0.9 ? accent : colors.border}`,
+        borderRadius: 14, overflow: 'hidden', transition: 'all 0.4s ease',
+        boxShadow: scale > 0.9 ? `0 0 40px ${glow}, 0 8px 32px rgba(0,0,0,0.4)` : '0 2px 12px rgba(0,0,0,0.3)',
+        flexShrink: 0,
+      }}>
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${accent}, transparent)` }} />
+        <div style={{ padding: scale > 0.9 ? '20px 22px' : '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: scale > 0.9 ? 12 : 6 }}>
+            <div style={{ width: scale > 0.9 ? 40 : 28, height: scale > 0.9 ? 40 : 28, borderRadius: 8, background: glow, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {d.icon || d.iconKey && icons[d.iconKey] || null}
+            </div>
+            <div>
+              <div style={{ fontSize: scale > 0.9 ? 11 : 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent }}>
+                {d.stageLabel}
+              </div>
+              <div style={{ fontSize: scale > 0.9 ? 18 : 11, fontWeight: 600, color: colors.text, marginTop: 2 }}>
+                {d.title}
+              </div>
+            </div>
+          </div>
+          {d.badge && scale > 0.9 && (
+            <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: `${accent}22`, color: accent, marginBottom: 8 }}>
+              {d.badge}
+            </span>
+          )}
+          {d.summary && scale > 0.9 && (
+            <div style={{ fontSize: 13, color: colors.textMuted, lineHeight: 1.6, marginTop: 8 }}>
+              {d.summary}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const d = step.data || {};
+
+  return (
+    <div ref={containerRef} style={{
+      position: 'fixed', inset: 0, zIndex: 1000, background: colors.bg,
+      display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif",
+    }}>
+      {/* Top bar: progress */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 24px', gap: 12 }}>
+        <span style={{ fontSize: 12, color: colors.textDim }}>
+          {idx + 1} of {steps.length}
+        </span>
+        <div style={{ width: 200, height: 4, background: colors.border, borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ width: `${((idx + 1) / steps.length) * 100}%`, height: '100%', background: colors.blue, borderRadius: 2, transition: 'width 0.3s ease' }} />
+        </div>
+      </div>
+
+      {/* Controls: top-right */}
+      <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', gap: 6, zIndex: 10 }}>
+        <button onClick={() => setAutoPlay((p) => !p)} style={{
+          width: 34, height: 34, borderRadius: 8, background: autoPlay ? `${colors.blue}22` : colors.surfaceHover,
+          border: `1px solid ${autoPlay ? colors.blue + '55' : colors.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: autoPlay ? colors.blue : colors.textMuted, fontSize: 16,
+        }} title={autoPlay ? 'Pause auto-play (Space)' : 'Start auto-play (Space)'}>
+          {autoPlay ? '⏸' : '▶'}
+        </button>
+        {autoPlay && (
+          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} style={{
+            height: 34, borderRadius: 8, background: colors.surfaceHover, border: `1px solid ${colors.border}`,
+            color: colors.textMuted, fontSize: 11, padding: '0 8px', cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+          }}>
+            <option value={5}>5s</option>
+            <option value={8}>8s</option>
+            <option value={12}>12s</option>
+            <option value={20}>20s</option>
+            <option value={30}>30s</option>
+          </select>
+        )}
+        <button onClick={() => {
+          if (!isFullscreen) { containerRef.current?.requestFullscreen?.(); setIsFullscreen(true); }
+          else { document.exitFullscreen?.(); setIsFullscreen(false); }
+        }} style={{
+          width: 34, height: 34, borderRadius: 8, background: colors.surfaceHover,
+          border: `1px solid ${colors.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: colors.textMuted, fontSize: 14,
+        }} title="Toggle fullscreen (F)">
+          {isFullscreen ? '⊡' : '⛶'}
+        </button>
+        <button onClick={onExit} style={{
+          width: 34, height: 34, borderRadius: 8, background: colors.surfaceHover,
+          border: `1px solid ${colors.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: colors.rose, fontSize: 16, fontWeight: 700,
+        }} title="Exit presentation (Esc)">
+          ✕
+        </button>
+      </div>
+
+      {/* Spotlight area */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, padding: '0 40px', minHeight: 0 }}>
+        {renderCard(prevStep, 0.8, 0.25)}
+        {renderCard(step, 1.05, 1)}
+        {renderCard(nextStep, 0.8, 0.25)}
+      </div>
+
+      {/* Speaker notes */}
+      <div style={{ padding: '16px 40px 20px', maxHeight: '30vh', overflow: 'auto' }}>
+        <div style={{
+          background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12,
+          padding: '16px 24px', maxWidth: 700, margin: '0 auto',
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: colors.textDim, marginBottom: 8 }}>
+            Speaker notes
+          </div>
+          <div style={{ fontSize: 14, color: colors.text, lineHeight: 1.7 }}>
+            {d.summary || 'No notes for this step.'}
+          </div>
+          {d.details && d.details.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 12, color: colors.textMuted, lineHeight: 1.6 }}>
+              {d.details.map((detail, di) => (
+                <div key={di} style={{ marginBottom: 8 }}>
+                  <span style={{ fontWeight: 600, color: colors.text }}>{detail.heading}: </span>
+                  {detail.items ? detail.items.join(' · ') : ''}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Navigation arrows */}
+      <div style={{ position: 'absolute', bottom: '50%', left: 16, transform: 'translateY(50%)' }}>
+        <button onClick={() => setIdx((i) => Math.max(i - 1, 0))} disabled={idx === 0} style={{
+          width: 44, height: 44, borderRadius: '50%', background: colors.surfaceHover,
+          border: `1px solid ${colors.border}`, cursor: idx === 0 ? 'default' : 'pointer',
+          opacity: idx === 0 ? 0.3 : 1, color: colors.textMuted, fontSize: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>◂</button>
+      </div>
+      <div style={{ position: 'absolute', bottom: '50%', right: 16, transform: 'translateY(50%)' }}>
+        <button onClick={() => setIdx((i) => Math.min(i + 1, steps.length - 1))} disabled={idx >= steps.length - 1} style={{
+          width: 44, height: 44, borderRadius: '50%', background: colors.surfaceHover,
+          border: `1px solid ${colors.border}`, cursor: idx >= steps.length - 1 ? 'default' : 'pointer',
+          opacity: idx >= steps.length - 1 ? 0.3 : 1, color: colors.textMuted, fontSize: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>▸</button>
+      </div>
+
+      {/* Keyboard hint */}
+      <div style={{
+        position: 'absolute', bottom: 8, right: 16, fontSize: 10, color: colors.textDim,
+        display: 'flex', gap: 12,
+      }}>
+        <span>← → navigate</span>
+        <span>Space pause/play</span>
+        <span>F fullscreen</span>
+        <span>Esc exit</span>
+      </div>
+    </div>
   );
 }
 
