@@ -167,11 +167,12 @@ function StageNode({ id, data }) {
         >✕</button>
       )}
 
-      {/* resize handle (visible on hover) */}
+      {/* resize handle — bottom edge (visible on hover) */}
       {hovered && data._onResize && (
         <div
+          className="nodrag nopan"
           onMouseEnter={() => setHovered(true)}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
             const startY = e.clientY;
@@ -182,11 +183,11 @@ function StageNode({ id, data }) {
               data._onResize(id, nh);
             };
             const handleUp = () => {
-              window.removeEventListener('mousemove', handleMove);
-              window.removeEventListener('mouseup', handleUp);
+              window.removeEventListener('pointermove', handleMove);
+              window.removeEventListener('pointerup', handleUp);
             };
-            window.addEventListener('mousemove', handleMove);
-            window.addEventListener('mouseup', handleUp);
+            window.addEventListener('pointermove', handleMove);
+            window.addEventListener('pointerup', handleUp);
           }}
           style={{
             position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
@@ -203,8 +204,9 @@ function StageNode({ id, data }) {
       {/* horizontal resize handle — right edge (visible on hover) */}
       {hovered && data._onResizeWidth && (
         <div
+          className="nodrag nopan"
           onMouseEnter={() => setHovered(true)}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
             const startX = e.clientX;
@@ -215,11 +217,11 @@ function StageNode({ id, data }) {
               data._onResizeWidth(id, nw);
             };
             const handleUp = () => {
-              window.removeEventListener('mousemove', handleMove);
-              window.removeEventListener('mouseup', handleUp);
+              window.removeEventListener('pointermove', handleMove);
+              window.removeEventListener('pointerup', handleUp);
             };
-            window.addEventListener('mousemove', handleMove);
-            window.addEventListener('mouseup', handleUp);
+            window.addEventListener('pointermove', handleMove);
+            window.addEventListener('pointerup', handleUp);
           }}
           style={{
             position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)',
