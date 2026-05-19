@@ -112,6 +112,81 @@ const COLOR_PRESETS = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════
+   INLINE NOTES — editable notes section within each node
+   ═══════════════════════════════════════════════════════════════════════ */
+function InlineNotes({ nodeId, notes, editMode, onNotesChange, accentColor }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(notes);
+
+  // Sync draft when notes prop changes from outside
+  React.useEffect(() => { setDraft(notes); }, [notes]);
+
+  const handleSave = useCallback(() => {
+    setEditing(false);
+    if (onNotesChange) onNotesChange(nodeId, draft);
+  }, [nodeId, draft, onNotesChange]);
+
+  // If no notes and not in edit mode, show nothing
+  if (!notes && !editMode) return null;
+
+  return (
+    <div
+      className="nodrag nopan"
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        borderTop: `1px solid ${colors.border}`,
+        padding: '8px 18px 10px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: `${accentColor}99` }}>
+          Notes
+        </span>
+        {editMode && !editing && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 10, color: colors.textDim, padding: '0 2px',
+            }}
+          >
+            ✎
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <textarea
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => { if (e.key === 'Escape') handleSave(); }}
+          style={{
+            width: '100%', minHeight: 50, maxHeight: 150, background: `${colors.bg}88`,
+            border: `1px solid ${colors.border}`, borderRadius: 6,
+            outline: 'none', resize: 'vertical', fontFamily: "'Inter', sans-serif",
+            fontSize: 11, lineHeight: 1.5, color: colors.text, padding: '6px 8px',
+          }}
+          placeholder="Add notes..."
+        />
+      ) : (
+        <div
+          onDoubleClick={(e) => { if (editMode) { e.stopPropagation(); setEditing(true); } }}
+          style={{
+            fontSize: 11, lineHeight: 1.5, color: colors.textMuted,
+            whiteSpace: 'pre-wrap', minHeight: editMode ? 20 : undefined,
+            cursor: editMode ? 'text' : 'default',
+            fontStyle: notes ? 'normal' : 'italic',
+          }}
+        >
+          {notes || (editMode ? 'Double-click to add notes...' : '')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    CUSTOM NODE — shared by both tabs
    ═══════════════════════════════════════════════════════════════════════ */
 function StageNode({ id, data }) {
@@ -321,6 +396,17 @@ function StageNode({ id, data }) {
             </div>
           ))}
         </div>
+      )}
+
+      {/* inline notes section */}
+      {(data._notes || data._editMode) && (
+        <InlineNotes
+          nodeId={id}
+          notes={data._notes || ''}
+          editMode={data._editMode || false}
+          onNotesChange={data._onNotesChange}
+          accentColor={accentColor}
+        />
       )}
 
       {/* handles — inside inner card div for positioning relative to card */}
@@ -1437,20 +1523,36 @@ function buildBusinessNodeData() {
         details: [{ heading: 'What Happens', items: [
           'Client confirms design approval (via email, call, etc.)',
           'Salesman moves HubSpot deal stage to "Design Approved"',
-          'This stage change triggers the next automated step',
+          'Salesman now enters production data before agreement is sent',
         ]}],
       },
     },
     {
-      id: 'b-docusign', baseHeight: 140, expandedExtra: 150,
+      id: 'b-proddata', baseHeight: 140, expandedExtra: 180,
       data: {
-        stageLabel: 'Step 5', title: 'Production Agreement Sent', icon: icons.docusign,
+        stageLabel: 'Step 5', title: 'Production Data Entry', icon: icons.dataEntry,
+        accentColor: colors.pink, glowColor: colors.pinkGlow, badge: 'MANUAL',
+        summary: 'Salesman enters production-specific data into HubSpot deal properties — factory specs, quantities, shipping details, production timeline. This data populates the Production Agreement.',
+        handleTop: true, handleBottom: true,
+        details: [{ heading: 'What Happens', items: [
+          'Salesman fills in production form fields on the HubSpot deal',
+          'Data includes factory details, quantities, timelines, special requests',
+          'This data populates the Production Agreement sent in the next step',
+          'Data also flows into Teamwork when production kicks off later',
+        ]}],
+      },
+    },
+    {
+      id: 'b-docusign', baseHeight: 140, expandedExtra: 170,
+      data: {
+        stageLabel: 'Step 6', title: 'Production Agreement Sent', icon: icons.docusign,
         accentColor: colors.indigo, glowColor: colors.indigoGlow, badge: 'AUTO',
-        summary: 'HubSpot automatically sends a DocuSign Production Agreement to the client for signature.',
+        summary: 'HubSpot automatically sends a DocuSign Production Agreement to the client for signature. Agreement is pre-populated with production data from Step 5.',
         handleTop: true, handleBottom: true,
         details: [{ heading: 'What Fires Automatically', items: [
-          'HubSpot workflow triggers on "Design Approved" stage',
-          'DocuSign Production Agreement envelope sent to client',
+          'HubSpot workflow triggers once production data is complete',
+          'DocuSign Production Agreement generated with deal properties',
+          'Agreement includes factory specs, quantities, timeline, and pricing',
           'Client receives email with agreement to review and sign',
         ]}],
       },
@@ -1458,9 +1560,9 @@ function buildBusinessNodeData() {
     {
       id: 'b-signed', baseHeight: 150, expandedExtra: 200,
       data: {
-        stageLabel: 'Step 6', title: 'Agreement Signed', icon: icons.signed,
+        stageLabel: 'Step 7', title: 'Agreement Signed', icon: icons.signed,
         accentColor: colors.emerald, glowColor: colors.emeraldGlow, badge: 'AUTO',
-        summary: 'Client signs the agreement. Deal stage moves to "Agreement Signed," which triggers automated invoice creation and sending via QuickBooks Online. Deal remains in "Agreement Signed" stage.',
+        summary: 'Client signs the agreement. Deal stage moves to "Agreement Signed," which triggers automated invoice creation and sending via QuickBooks Online.',
         handleTop: true, handleBottom: true,
         details: [
           { heading: 'Trigger', items: ['DocuSign completion → deal stage moves to "Agreement Signed"'] },
@@ -1469,20 +1571,6 @@ function buildBusinessNodeData() {
             'Deal remains in "Agreement Signed" stage throughout',
           ]},
         ],
-      },
-    },
-    {
-      id: 'b-proddata', baseHeight: 140, expandedExtra: 160,
-      data: {
-        stageLabel: 'Step 7', title: 'Production Data Entry', icon: icons.dataEntry,
-        accentColor: colors.pink, glowColor: colors.pinkGlow, badge: 'MANUAL',
-        summary: 'Salesman manually enters production-specific data into HubSpot deal properties — factory specs, shipping details, production timeline.',
-        handleTop: true, handleBottom: true,
-        details: [{ heading: 'What Happens', items: [
-          'Salesman fills in production form fields on the HubSpot deal',
-          'Data includes factory details, timelines, special requests',
-          'This data will flow into Teamwork when production kicks off',
-        ]}],
       },
     },
     {
@@ -1550,15 +1638,15 @@ const businessEdgeLabels = [
   'Stage → "Waiting on First Render"',
   'Design tasks in Teamwork',
   'Stage → "Design Approved"',
-  'DocuSign auto-sent',
-  'Agreement signed → invoices sent',
   'Production specs entered',
+  'Agreement auto-sent with specs',
+  'Agreement signed → invoices sent',
   'Stage → "Production"',
   'PC assigned → handoff scheduled',
 ];
 
 function buildBusinessEdges() {
-  const ids = ['b-form', 'b-firstrender', 'b-designwork', 'b-approved', 'b-docusign', 'b-signed', 'b-proddata', 'b-invoicepaid', 'b-production', 'b-handoff'];
+  const ids = ['b-form', 'b-firstrender', 'b-designwork', 'b-approved', 'b-proddata', 'b-docusign', 'b-signed', 'b-invoicepaid', 'b-production', 'b-handoff'];
   return ids.slice(0, -1).map((src, i) => ({
     id: `be-${i}`, source: src, target: ids[i + 1], ...edgeDefaults,
     label: businessEdgeLabels[i],
@@ -1877,8 +1965,8 @@ const designTimelinePhases = [
   { id: 'tl-des-1', title: 'Form Entry', weekLabel: 'Day 1', duration: '1 day', accentColor: colors.blue, nodeIds: ['b-form'] },
   { id: 'tl-des-2', title: 'Automation & Assignment', weekLabel: 'Wk 1', duration: '~1 week', accentColor: colors.orange, nodeIds: ['b-firstrender'] },
   { id: 'tl-des-3', title: 'Design Work', weekLabel: 'Wk 2–5', duration: '3–4 weeks', accentColor: colors.purple, nodeIds: ['b-designwork'] },
-  { id: 'tl-des-4', title: 'Approvals', weekLabel: 'Wk 5–6', duration: '~1 week', accentColor: colors.green, nodeIds: ['b-approved', 'b-docusign', 'b-signed'] },
-  { id: 'tl-des-5', title: 'Production Data', weekLabel: 'Wk 6–7', duration: '~1 week', accentColor: colors.pink, nodeIds: ['b-proddata', 'b-invoicepaid'] },
+  { id: 'tl-des-4', title: 'Approval & Production Data', weekLabel: 'Wk 5–6', duration: '~1 week', accentColor: colors.green, nodeIds: ['b-approved', 'b-proddata'] },
+  { id: 'tl-des-5', title: 'Agreement & Payment', weekLabel: 'Wk 6–7', duration: '~1 week', accentColor: colors.indigo, nodeIds: ['b-docusign', 'b-signed', 'b-invoicepaid'] },
   { id: 'tl-des-6', title: 'Production Setup', weekLabel: 'Wk 7–8', duration: '~1 week', accentColor: colors.lime, nodeIds: ['b-production', 'b-handoff'] },
 ];
 
@@ -2034,6 +2122,18 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const [presenting, setPresenting] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
+  // ── Node notes (persisted in localStorage per viewId) ──
+  const notesKey = `flowchart-notes-data-${viewId || 'default'}`;
+  const [nodeNotes, setNodeNotes] = useState(() => {
+    try { const s = localStorage.getItem(notesKey); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  useEffect(() => {
+    localStorage.setItem(notesKey, JSON.stringify(nodeNotes));
+  }, [nodeNotes, notesKey]);
+  const handleNotesChange = useCallback((nodeId, text) => {
+    setNodeNotes((prev) => ({ ...prev, [nodeId]: text }));
+  }, []);
+
   // ── Sticky notes (persisted in localStorage per viewId) ──
   const storageKey = `flowchart-notes-${viewId || 'default'}`;
   const [stickyNotes, setStickyNotes] = useState(() => {
@@ -2155,6 +2255,9 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         _baseHeight: nd.baseHeight || nd._spanHeight || 150,
         _customWidth: nd.baseWidth || undefined,
         _spanHeight: nd._spanHeight,
+        _notes: nodeNotes[nd.id] || '',
+        _editMode: editMode,
+        _onNotesChange: handleNotesChange,
       };
       return {
         id: nd.id,
@@ -2183,6 +2286,9 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           _onToggle: onToggle,
           ...(editMode ? { _onDelete: handleDeleteNode, _onResize: handleResizeNode, _onResizeWidth: handleResizeWidth } : {}),
           _baseHeight: 150,
+          _notes: nodeNotes[sideNode.id] || '',
+          _editMode: editMode,
+          _onNotesChange: handleNotesChange,
         },
       });
     }
@@ -2229,7 +2335,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, weekGrid, editMode]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, weekGrid, editMode, nodeNotes, handleNotesChange]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -2692,6 +2798,19 @@ const designThoughtBubbles = [
       title: 'Design Revisions',
       accentColor: colors.purple,
       content: 'Client may request revisions during this phase. Multiple rounds of feedback are common — each revision cycle adds ~3–5 business days. The design is not locked until the client explicitly approves and the deal moves to "Design Approved."',
+      handleBottom: false,
+    },
+  },
+  {
+    id: 'thought-handoff-automation',
+    anchorId: 'b-handoff',
+    offsetX: 420,
+    offsetY: -10,
+    type: 'thoughtBubble',
+    data: {
+      title: 'Automation Opportunity',
+      accentColor: colors.emerald,
+      content: 'Streamline the handoff with a predrafted client intro email. When the Production Coordinator is assigned (Step 9), n8n auto-generates an email introducing the PC to the client — pre-populated with project details, timeline, and PC contact info. Salesman reviews and sends, or it fires automatically. Eliminates scheduling delays and ensures consistent handoff communication.',
       handleBottom: false,
     },
   },
