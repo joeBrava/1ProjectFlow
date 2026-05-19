@@ -480,11 +480,64 @@ function SpanBar({ data }) {
 /* ═══════════════════════════════════════════════════════════════════════
    TIMELINE PHASE — tall banner node showing a phase label, week range, etc.
    ═══════════════════════════════════════════════════════════════════════ */
-function TimelinePhase({ data }) {
+const TIMELINE_COLORS = [
+  { color: colors.blue, label: 'Blue' },
+  { color: colors.orange, label: 'Orange' },
+  { color: colors.green, label: 'Green' },
+  { color: colors.purple, label: 'Purple' },
+  { color: colors.cyan, label: 'Cyan' },
+  { color: colors.rose, label: 'Rose' },
+  { color: colors.pink, label: 'Pink' },
+  { color: colors.emerald, label: 'Emerald' },
+  { color: colors.lime, label: 'Lime' },
+  { color: '#94a3b8', label: 'Slate' },
+];
+
+function TimelinePhase({ id, data }) {
   const accent = data.accentColor || colors.blue;
   const height = data.phaseHeight || 200;
+  const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(data.title);
+  const [editWeek, setEditWeek] = useState(data.weekLabel);
+  const [editDuration, setEditDuration] = useState(data.duration || '');
+
+  // Sync local state when data changes (e.g. reset)
+  useEffect(() => {
+    if (!editing) {
+      setEditTitle(data.title);
+      setEditWeek(data.weekLabel);
+      setEditDuration(data.duration || '');
+    }
+  }, [data.title, data.weekLabel, data.duration, editing]);
+
+  const handleSave = () => {
+    if (data._onUpdate) {
+      data._onUpdate(id, { title: editTitle, weekLabel: editWeek, duration: editDuration });
+    }
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') setEditing(false);
+  };
+
+  const handleColorPick = (c) => {
+    if (data._onUpdate) data._onUpdate(id, { accentColor: c });
+  };
+
+  const editInputSt = {
+    width: '100%', padding: '3px 5px', borderRadius: 4,
+    border: `1px solid ${colors.border}`, background: colors.bg,
+    color: colors.text, fontSize: 10, fontFamily: "'Inter', sans-serif",
+    outline: 'none', boxSizing: 'border-box', marginBottom: 4,
+  };
+
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 120,
         height,
@@ -496,39 +549,138 @@ function TimelinePhase({ data }) {
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
-      {/* Week range badge at top */}
-      <span style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
-        color: accent, textTransform: 'uppercase', marginBottom: 6,
-      }}>
-        {data.weekLabel}
-      </span>
-      {/* Phase title */}
-      <div style={{
-        fontSize: 12, fontWeight: 600, color: colors.text,
-        lineHeight: 1.3, marginBottom: 6,
-      }}>
-        {data.title}
-      </div>
-      {/* Duration tag */}
-      {data.duration && (
-        <span style={{
-          display: 'inline-block', fontSize: 8, fontWeight: 600,
-          padding: '2px 5px', borderRadius: 3,
-          background: `${accent}22`, color: accent,
-          alignSelf: 'flex-start',
-        }}>
-          {data.duration}
-        </span>
+      {/* Delete button */}
+      {hovered && !editing && data._onDelete && (
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onClick={(e) => { e.stopPropagation(); data._onDelete(id); }}
+          style={{
+            position: 'absolute', top: -8, right: -8, width: 18, height: 18,
+            borderRadius: '50%', background: colors.rose, color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, cursor: 'pointer', zIndex: 10,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+          }}
+        >
+          ×
+        </div>
       )}
+
+      {/* Resize handle */}
+      {hovered && !editing && (
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startY = e.clientY;
+            const startH = height;
+            const onMove = (ev) => {
+              const delta = ev.clientY - startY;
+              const snapped = Math.round((startH + delta) / 50) * 50;
+              const newH = Math.max(60, snapped);
+              if (data._onUpdate) data._onUpdate(id, { _heightOverride: newH });
+            };
+            const onUp = () => {
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+          }}
+          style={{
+            position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
+            width: 30, height: 6, borderRadius: 3,
+            background: accent, cursor: 'ns-resize', opacity: 0.7, zIndex: 10,
+          }}
+        />
+      )}
+
+      {editing ? (
+        <>
+          <input value={editWeek} onChange={(e) => setEditWeek(e.target.value)} onKeyDown={handleKeyDown} style={editInputSt} placeholder="Wk 1-2" autoFocus />
+          <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} onKeyDown={handleKeyDown} style={editInputSt} placeholder="Phase title" />
+          <input value={editDuration} onChange={(e) => setEditDuration(e.target.value)} onKeyDown={handleKeyDown} style={editInputSt} placeholder="~1 week" />
+          {/* Color swatches */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+            {TIMELINE_COLORS.map((tc) => (
+              <div
+                key={tc.color}
+                onClick={() => handleColorPick(tc.color)}
+                style={{
+                  width: 14, height: 14, borderRadius: 3, cursor: 'pointer',
+                  background: tc.color, border: tc.color === accent ? '2px solid #fff' : '1px solid transparent',
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              onClick={handleSave}
+              style={{
+                flex: 1, padding: '3px 0', borderRadius: 4, border: 'none',
+                background: accent, color: '#fff', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              style={{
+                flex: 1, padding: '3px 0', borderRadius: 4,
+                border: `1px solid ${colors.border}`, background: 'transparent',
+                color: colors.textMuted, fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <div onDoubleClick={() => setEditing(true)} style={{ cursor: 'default', flex: 1 }}>
+          {/* Week range badge at top */}
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+            color: accent, textTransform: 'uppercase', marginBottom: 6, display: 'block',
+          }}>
+            {data.weekLabel}
+          </span>
+          {/* Phase title */}
+          <div style={{
+            fontSize: 12, fontWeight: 600, color: colors.text,
+            lineHeight: 1.3, marginBottom: 6,
+          }}>
+            {data.title}
+          </div>
+          {/* Duration tag */}
+          {data.duration && (
+            <span style={{
+              display: 'inline-block', fontSize: 8, fontWeight: 600,
+              padding: '2px 5px', borderRadius: 3,
+              background: `${accent}22`, color: accent,
+            }}>
+              {data.duration}
+            </span>
+          )}
+          {/* Hover hint */}
+          {hovered && (
+            <div style={{ fontSize: 8, color: colors.textDim, marginTop: 6, fontStyle: 'italic' }}>
+              Double-click to edit
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Vertical line indicator at the bottom */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 3, background: `${accent}40`, borderRadius: '0 0 8px 8px',
-      }} />
+      {!editing && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          height: 3, background: `${accent}40`, borderRadius: '0 0 8px 8px',
+        }} />
+      )}
     </div>
   );
 }
@@ -666,6 +818,91 @@ function useFlowEditor(viewId, defaultNodes, defaultEdges) {
   const hasEdits = edits !== null;
 
   return { nodes, edges, addNode, deleteNode, updateNodeHeight, resetAll, hasEdits };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TIMELINE EDITOR HOOK — persists phase edits per view
+   ═══════════════════════════════════════════════════════════════════════ */
+function useTimelineEditor(viewId, defaultPhases) {
+  const key = `timeline-editor-${viewId}`;
+
+  const [edits, setEdits] = useState(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (edits) localStorage.setItem(key, JSON.stringify(edits));
+    else localStorage.removeItem(key);
+  }, [edits, key]);
+
+  // Merge defaults + edits into final phases array
+  const phases = useMemo(() => {
+    if (!edits) return defaultPhases || [];
+    const defaults = defaultPhases || [];
+    // Filter deleted defaults
+    let result = defaults.filter((p) => !(edits.deletedIds || []).includes(p.id));
+    // Apply overrides to remaining defaults
+    result = result.map((p) => {
+      const ov = (edits.overrides || {})[p.id];
+      if (!ov) return p;
+      return { ...p, ...ov };
+    });
+    // Append added phases
+    for (const added of edits.addedPhases || []) {
+      result.push(added);
+    }
+    return result;
+  }, [defaultPhases, edits]);
+
+  const updatePhase = useCallback((phaseId, updates) => {
+    setEdits((prev) => {
+      const s = prev || { overrides: {}, deletedIds: [], addedPhases: [] };
+      // Check if it's an added phase
+      const addedIdx = (s.addedPhases || []).findIndex((p) => p.id === phaseId);
+      if (addedIdx >= 0) {
+        const updated = [...s.addedPhases];
+        updated[addedIdx] = { ...updated[addedIdx], ...updates };
+        return { ...s, addedPhases: updated };
+      }
+      return {
+        ...s,
+        overrides: { ...(s.overrides || {}), [phaseId]: { ...(s.overrides || {})[phaseId], ...updates } },
+      };
+    });
+  }, []);
+
+  const deletePhase = useCallback((phaseId) => {
+    setEdits((prev) => {
+      const s = prev || { overrides: {}, deletedIds: [], addedPhases: [] };
+      // If it's an added phase, just remove it
+      const addedIdx = (s.addedPhases || []).findIndex((p) => p.id === phaseId);
+      if (addedIdx >= 0) {
+        const updated = [...s.addedPhases];
+        updated.splice(addedIdx, 1);
+        return { ...s, addedPhases: updated };
+      }
+      // Otherwise mark default as deleted
+      return { ...s, deletedIds: [...(s.deletedIds || []), phaseId] };
+    });
+  }, []);
+
+  const addPhase = useCallback((phaseData) => {
+    setEdits((prev) => {
+      const s = prev || { overrides: {}, deletedIds: [], addedPhases: [] };
+      return { ...s, addedPhases: [...(s.addedPhases || []), phaseData] };
+    });
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setEdits(null);
+  }, []);
+
+  const hasEdits = edits !== null;
+
+  return { phases, updatePhase, deletePhase, addPhase, resetAll, hasEdits };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1478,9 +1715,9 @@ const designTimelinePhases = [
 
 /**
  * Compute timeline phase node positions based on already-positioned flow nodes.
- * Returns an array of React Flow node objects of type 'timelinePhase'.
+ * Accepts callbacks for editing. Phases with _heightOverride or _yOverride use those.
  */
-function computeTimelineNodes(phases, positionedNodes, xOffset) {
+function computeTimelineNodes(phases, positionedNodes, xOffset, callbacks) {
   const posMap = {};
   const hMap = {};
   for (const nd of positionedNodes) {
@@ -1488,31 +1725,55 @@ function computeTimelineNodes(phases, positionedNodes, xOffset) {
     hMap[nd.id] = nd.baseHeight || 140;
   }
 
+  // Find the last positioned node's bottom Y (for "added" phases without nodeIds)
+  let maxFlowBottom = 0;
+  for (const nd of positionedNodes) {
+    const bottom = (nd.position?.y || 0) + (nd.baseHeight || 140);
+    if (bottom > maxFlowBottom) maxFlowBottom = bottom;
+  }
+
   return phases.map((phase) => {
     let minY = Infinity;
     let maxYBottom = -Infinity;
-    for (const nid of phase.nodeIds) {
-      const pos = posMap[nid];
-      if (!pos) continue;
-      if (pos.y < minY) minY = pos.y;
-      const bottom = pos.y + (hMap[nid] || 140);
-      if (bottom > maxYBottom) maxYBottom = bottom;
-    }
-    if (minY === Infinity) return null;
 
-    const phaseHeight = Math.max(maxYBottom - minY, 60);
+    if (phase.nodeIds && phase.nodeIds.length > 0) {
+      for (const nid of phase.nodeIds) {
+        const pos = posMap[nid];
+        if (!pos) continue;
+        if (pos.y < minY) minY = pos.y;
+        const bottom = pos.y + (hMap[nid] || 140);
+        if (bottom > maxYBottom) maxYBottom = bottom;
+      }
+    }
+
+    // For added phases without valid nodeIds, position below the flow
+    if (minY === Infinity) {
+      if (phase._yOverride != null) {
+        minY = phase._yOverride;
+      } else {
+        minY = maxFlowBottom + 50;
+        maxFlowBottom = minY + 100;
+      }
+      maxYBottom = minY + (phase._heightOverride || 100);
+    }
+
+    const phaseHeight = phase._heightOverride || Math.max(maxYBottom - minY, 60);
+    const yPos = phase._yOverride != null ? phase._yOverride : minY;
+
     return {
       id: phase.id,
       type: 'timelinePhase',
-      position: { x: xOffset, y: minY },
+      position: { x: xOffset, y: yPos },
       data: {
         title: phase.title,
         weekLabel: phase.weekLabel,
         duration: phase.duration,
         accentColor: phase.accentColor,
         phaseHeight,
+        _onUpdate: callbacks?.onUpdate,
+        _onDelete: callbacks?.onDelete,
       },
-      draggable: false,
+      draggable: true,
       selectable: false,
     };
   }).filter(Boolean);
@@ -1653,6 +1914,30 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const { nodes: editorNodes, edges: editorEdges, addNode: editorAddNode, deleteNode: editorDeleteNode, updateNodeHeight: editorUpdateHeight, resetAll: editorReset, hasEdits: editorHasEdits } = editor;
   const [showAddModal, setShowAddModal] = useState(false);
   const [insertEdgeCtx, setInsertEdgeCtx] = useState(null); // { edgeId, sourceId, targetId }
+
+  // ── Timeline editor state (persisted add/delete/edit phases) ──
+  const tlEditor = useTimelineEditor(viewId, timelinePhases);
+  const { phases: tlPhases, updatePhase: tlUpdatePhase, deletePhase: tlDeletePhase, addPhase: tlAddPhase, resetAll: tlReset, hasEdits: tlHasEdits } = tlEditor;
+
+  const handleTlUpdate = useCallback((phaseId, updates) => {
+    tlUpdatePhase(phaseId, updates);
+  }, [tlUpdatePhase]);
+
+  const handleTlDelete = useCallback((phaseId) => {
+    tlDeletePhase(phaseId);
+  }, [tlDeletePhase]);
+
+  const handleAddPhase = useCallback(() => {
+    const ts = Date.now();
+    tlAddPhase({
+      id: `tl-new-${ts}`,
+      title: 'New Phase',
+      weekLabel: 'Wk ?',
+      duration: '~? weeks',
+      accentColor: colors.blue,
+      nodeIds: [],
+    });
+  }, [tlAddPhase]);
 
   // ── Sticky notes (persisted in localStorage per viewId) ──
   const storageKey = `flowchart-notes-${viewId || 'default'}`;
@@ -1800,9 +2085,12 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       }
     }
 
-    // Timeline phase banners
-    if (timelinePhases && timelineXOffset != null) {
-      const tlNodes = computeTimelineNodes(timelinePhases, positioned, timelineXOffset);
+    // Timeline phase banners (using editor-merged phases)
+    if (tlPhases && tlPhases.length > 0 && timelineXOffset != null) {
+      const tlNodes = computeTimelineNodes(tlPhases, positioned, timelineXOffset, {
+        onUpdate: handleTlUpdate,
+        onDelete: handleTlDelete,
+      });
       result.push(...tlNodes);
     }
 
@@ -1826,7 +2114,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, timelinePhases, timelineXOffset]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -1862,6 +2150,14 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           continue;
         }
 
+        // Timeline phase drag — persist Y position
+        const tlMatch = tlPhases && tlPhases.find((p) => p.id === change.id);
+        if (tlMatch) {
+          handleTlUpdate(change.id, { _yOverride: change.position.y });
+          dragOffsets.current[change.id] = { x: 0, y: 0 };
+          continue;
+        }
+
         const nd = positioned.find((n) => n.id === change.id);
         if (nd) {
           dragOffsets.current[change.id] = {
@@ -1879,7 +2175,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         }
       }
     }
-  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes]);
+  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, tlPhases, handleTlUpdate]);
 
   return (
     <>
@@ -1908,8 +2204,11 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       <div className="editor-toolbar">
         <button onClick={addNote} className="toolbar-btn" title="Add a sticky note">+ Note</button>
         <button onClick={() => { setInsertEdgeCtx(null); setShowAddModal(true); }} className="toolbar-btn toolbar-btn-primary" title="Add a new step to the flow">+ Step</button>
-        {editorHasEdits && (
-          <button onClick={editorReset} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset</button>
+        {timelinePhases && (
+          <button onClick={handleAddPhase} className="toolbar-btn" title="Add a new timeline phase" style={{ borderColor: colors.purple, color: colors.purple }}>+ Phase</button>
+        )}
+        {(editorHasEdits || tlHasEdits) && (
+          <button onClick={() => { editorReset(); tlReset(); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
         )}
       </div>
 
