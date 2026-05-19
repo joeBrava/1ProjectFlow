@@ -213,7 +213,7 @@ function StageNode({ id, data }) {
         padding: 0,
         width: nodeWidth,
         height: nodeHeight || undefined,
-        overflow: nodeHeight ? 'hidden' : undefined,
+        overflow: nodeHeight ? 'hidden' : 'visible',
         cursor: hasExpandableContent ? 'pointer' : 'default',
         boxShadow: expanded
           ? `0 0 20px ${glowColor}, 0 4px 24px rgba(0,0,0,0.4)`
@@ -221,7 +221,6 @@ function StageNode({ id, data }) {
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         position: 'relative',
-        overflow: 'visible',
       }}
     >
       {/* delete button (visible on hover) */}
