@@ -1638,7 +1638,7 @@ function buildProductionNodeData() {
         stageLabel: 'Step 4', title: 'Sticker Design', icon: icons.sticker,
         accentColor: colors.amber, glowColor: colors.amberGlow, badge: '~1 WEEK',
         summary: 'Stickers designed based on client requests. Brick Designers measure available areas, Graphic Designers create the artwork. Up to 3 revisions. Client approval required.',
-        handleTop: true, handleBottom: true, handleLeftSource: true,
+        handleTop: true, handleBottom: true,
         details: [
           { heading: 'Process', items: [
             'Brick Designer measures available sticker areas on the set',
@@ -1827,7 +1827,7 @@ function buildProductionNodeData() {
         stageLabel: 'Background', title: 'Brick Production', icon: icons.factory,
         accentColor: '#94a3b8', glowColor: 'rgba(148, 163, 184, 0.08)', badge: 'SUPPLIER',
         summary: 'Bricks produced at supplier factory. Runs in parallel from test build approval through final production and shipping.',
-        handleTop: false, handleBottom: false, handleRightTarget: true,
+        handleTop: false, handleBottom: false,
       },
     },
   ];
@@ -1843,8 +1843,6 @@ const productionEdges = [
   // Fork from stickers
   { id: 'pe-stickers-render', source: 'p-stickers', target: 'p-finalrender', ...edgeDefaults, label: 'Stickers approved', labelStyle: prodEdgeLabelStyle, labelBgStyle, labelBgPadding: [6, 3], labelBgBorderRadius: 4 },
   { id: 'pe-stickers-instructions', source: 'p-stickers', target: 'p-instructions', ...edgeDefaults, label: 'Start instruction steps', labelStyle: prodEdgeLabelStyle, labelBgStyle, labelBgPadding: [6, 3], labelBgBorderRadius: 4 },
-  // Brick production span (left side)
-  { id: 'pe-stickers-brickprod', source: 'p-stickers', sourceHandle: 'left-source', target: 'p-brickprod', targetHandle: 'right', ...edgeDefaults, style: { ...edgeDefaults.style, stroke: '#94a3b8', strokeDasharray: '6 3' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 16, height: 16 }, label: 'Production begins', labelStyle: { fill: '#94a3b8', fontSize: 10, fontFamily: "'Inter', sans-serif" }, labelBgStyle, labelBgPadding: [6, 3], labelBgBorderRadius: 4 },
   // Left column
   { id: 'pe-render-boxes', source: 'p-finalrender', target: 'p-boxes', ...edgeDefaults, label: 'Render approved', labelStyle: prodEdgeLabelStyle, labelBgStyle, labelBgPadding: [6, 3], labelBgBorderRadius: 4 },
   { id: 'pe-boxes-coverart', source: 'p-boxes', target: 'p-coverart', ...edgeDefaults, label: 'Box design finalized', labelStyle: prodEdgeLabelStyle, labelBgStyle, labelBgPadding: [6, 3], labelBgBorderRadius: 4 },
@@ -2004,7 +2002,7 @@ function computePositions(nodeDataList, expandedSet, xCenter) {
 /* ═══════════════════════════════════════════════════════════════════════
    FLOW WRAPPER — handles expand/collapse with dynamic repositioning
    ═══════════════════════════════════════════════════════════════════════ */
-function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, timelinePhases, timelineXOffset, weekGrid, snapGridY }) {
+function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, weekGrid, snapGridY }) {
   const [expandedSet, setExpandedSet] = useState(new Set());
 
   // ── Drag offsets (restored from localStorage on mount) ──
@@ -2031,30 +2029,6 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const { nodes: editorNodes, edges: editorEdges, addNode: editorAddNode, deleteNode: editorDeleteNode, updateNodeHeight: editorUpdateHeight, updateNodeWidth: editorUpdateWidth, resetAll: editorReset, hasEdits: editorHasEdits } = editor;
   const [showAddModal, setShowAddModal] = useState(false);
   const [insertEdgeCtx, setInsertEdgeCtx] = useState(null); // { edgeId, sourceId, targetId }
-
-  // ── Timeline editor state (persisted add/delete/edit phases) ──
-  const tlEditor = useTimelineEditor(viewId, timelinePhases);
-  const { phases: tlPhases, updatePhase: tlUpdatePhase, deletePhase: tlDeletePhase, addPhase: tlAddPhase, resetAll: tlReset, hasEdits: tlHasEdits } = tlEditor;
-
-  const handleTlUpdate = useCallback((phaseId, updates) => {
-    tlUpdatePhase(phaseId, updates);
-  }, [tlUpdatePhase]);
-
-  const handleTlDelete = useCallback((phaseId) => {
-    tlDeletePhase(phaseId);
-  }, [tlDeletePhase]);
-
-  const handleAddPhase = useCallback(() => {
-    const ts = Date.now();
-    tlAddPhase({
-      id: `tl-new-${ts}`,
-      title: 'New Phase',
-      weekLabel: 'Wk ?',
-      duration: '~? weeks',
-      accentColor: colors.blue,
-      nodeIds: [],
-    });
-  }, [tlAddPhase]);
 
   // ── Sticky notes (persisted in localStorage per viewId) ──
   const storageKey = `flowchart-notes-${viewId || 'default'}`;
@@ -2223,15 +2197,6 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       }
     }
 
-    // Timeline phase banners (using editor-merged phases)
-    if (tlPhases && tlPhases.length > 0 && timelineXOffset != null) {
-      const tlNodes = computeTimelineNodes(tlPhases, positioned, timelineXOffset, {
-        onUpdate: handleTlUpdate,
-        onDelete: handleTlDelete,
-      });
-      result.push(...tlNodes);
-    }
-
     // Sticky notes
     for (const note of stickyNotes) {
       const offset = dragOffsets.current[note.id] || { x: 0, y: 0 };
@@ -2252,7 +2217,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete, weekGrid]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, weekGrid]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -2288,14 +2253,6 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           continue;
         }
 
-        // Timeline phase drag — persist Y position
-        const tlMatch = tlPhases && tlPhases.find((p) => p.id === change.id);
-        if (tlMatch) {
-          handleTlUpdate(change.id, { _yOverride: change.position.y });
-          dragOffsets.current[change.id] = { x: 0, y: 0 };
-          continue;
-        }
-
         const nd = positioned.find((n) => n.id === change.id);
         if (nd) {
           const rawY = change.position.y - nd.position.y;
@@ -2317,7 +2274,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         }
       }
     }
-  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, tlPhases, handleTlUpdate, snapGridY]);
+  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, snapGridY]);
 
   return (
     <>
@@ -2346,14 +2303,11 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       <div className="editor-toolbar">
         <button onClick={addNote} className="toolbar-btn" title="Add a sticky note">+ Note</button>
         <button onClick={() => { setInsertEdgeCtx(null); setShowAddModal(true); }} className="toolbar-btn toolbar-btn-primary" title="Add a new step to the flow">+ Step</button>
-        {timelinePhases && (
-          <button onClick={handleAddPhase} className="toolbar-btn" title="Add a new timeline phase" style={{ borderColor: colors.purple, color: colors.purple }}>+ Phase</button>
-        )}
         {hasDragChanges && (
           <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
         )}
-        {(editorHasEdits || tlHasEdits || hasDragChanges) && (
-          <button onClick={() => { editorReset(); tlReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
+        {(editorHasEdits || hasDragChanges) && (
+          <button onClick={() => { editorReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
         )}
       </div>
 
@@ -2612,8 +2566,6 @@ export default function App() {
             xCenter={400}
             extraNodes={designThoughtBubbles}
             extraEdges={designThoughtEdges}
-            timelinePhases={designTimelinePhases}
-            timelineXOffset={100}
           />
         ) : (
           <FlowView
@@ -2625,8 +2577,6 @@ export default function App() {
             sideNodeYIndex={0}
             xCenter={400}
             positionFn={computeProductionPositions}
-            timelinePhases={productionTimelinePhases}
-            timelineXOffset={-350}
             snapGridY={WEEK_HEIGHT}
             weekGrid={{ x: -550, weeks: PROD_WEEKS, rowHeight: WEEK_HEIGHT, gridWidth: 1300 }}
           />
