@@ -1920,7 +1920,9 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   if (typeof dragOffsets.current === 'function') {
     dragOffsets.current = dragOffsets.current();
   }
-  const [hasDragChanges, setHasDragChanges] = useState(false);
+  const [hasDragChanges, setHasDragChanges] = useState(() => {
+    try { const s = localStorage.getItem(dragKey); return s ? Object.keys(JSON.parse(s)).length > 0 : false; } catch { return false; }
+  });
 
   const handleSaveLayout = useCallback(() => {
     localStorage.setItem(dragKey, JSON.stringify(dragOffsets.current));
@@ -2195,16 +2197,18 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
 
         const nd = positioned.find((n) => n.id === change.id);
         if (nd) {
+          const rawY = change.position.y - nd.position.y;
           dragOffsets.current[change.id] = {
             x: change.position.x - nd.position.x,
-            y: change.position.y - nd.position.y,
+            y: snapGridY ? Math.round(rawY / snapGridY) * snapGridY : rawY,
           };
           setHasDragChanges(true);
         } else if (sideNode && change.id === sideNode.id) {
           const anchorNode = positioned[sideNodeYIndex] || positioned[positioned.length - 1];
+          const rawY = change.position.y - anchorNode.position.y;
           dragOffsets.current[change.id] = {
             x: change.position.x - (anchorNode.position.x + 470),
-            y: change.position.y - anchorNode.position.y,
+            y: snapGridY ? Math.round(rawY / snapGridY) * snapGridY : rawY,
           };
           setHasDragChanges(true);
         } else {
@@ -2212,7 +2216,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         }
       }
     }
-  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, tlPhases, handleTlUpdate]);
+  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, tlPhases, handleTlUpdate, snapGridY]);
 
   return (
     <>
@@ -2224,7 +2228,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         onEdgeClick={handleEdgeClick}
         nodeTypes={nodeTypes}
         snapToGrid
-        snapGrid={[20, snapGridY || 50]}
+        snapGrid={snapGridY ? [20, 1] : [20, 50]}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         minZoom={0.2}
@@ -2247,7 +2251,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         {hasDragChanges && (
           <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
         )}
-        {(editorHasEdits || tlHasEdits) && (
+        {(editorHasEdits || tlHasEdits || hasDragChanges) && (
           <button onClick={() => { editorReset(); tlReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
         )}
       </div>
