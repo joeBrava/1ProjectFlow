@@ -2138,7 +2138,10 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     result.push(...positioned.map((nd) => {
-      const offset = dragOffsets.current[nd.id] || { x: 0, y: 0 };
+      const saved = dragOffsets.current[nd.id];
+      const pos = saved?.abs
+        ? { x: saved.x, y: saved.y }
+        : { x: nd.position.x + (saved?.x || 0), y: nd.position.y + (saved?.y || 0) };
       const nodeData = {
         ...nd.data,
         _expanded: expandedSet.has(nd.id),
@@ -2154,7 +2157,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       return {
         id: nd.id,
         type: 'stage',
-        position: { x: nd.position.x + offset.x, y: nd.position.y + offset.y },
+        position: pos,
         data: nodeData,
       };
     }));
@@ -2162,11 +2165,14 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     // Side node (writeback, etc.)
     if (sideNode) {
       const anchorNode = positioned[sideNodeYIndex] || positioned[positioned.length - 1];
-      const offset = dragOffsets.current[sideNode.id] || { x: 0, y: 0 };
+      const savedSide = dragOffsets.current[sideNode.id];
+      const sidePos = savedSide?.abs
+        ? { x: savedSide.x, y: savedSide.y }
+        : { x: anchorNode.position.x + 470 + (savedSide?.x || 0), y: anchorNode.position.y + (savedSide?.y || 0) };
       result.push({
         id: sideNode.id,
         type: 'stage',
-        position: { x: anchorNode.position.x + 470 + offset.x, y: anchorNode.position.y + offset.y },
+        position: sidePos,
         data: {
           ...sideNode.data,
           _expanded: expandedSet.has(sideNode.id),
@@ -2183,14 +2189,17 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     if (extraNodes) {
       for (const en of extraNodes) {
         const anchorNode = positioned.find((n) => n.id === en.anchorId) || positioned[0];
-        const offset = dragOffsets.current[en.id] || { x: 0, y: 0 };
+        const savedExtra = dragOffsets.current[en.id];
+        const extraPos = savedExtra?.abs
+          ? { x: savedExtra.x, y: savedExtra.y }
+          : {
+              x: anchorNode.position.x + (en.offsetX || 420) + (savedExtra?.x || 0),
+              y: anchorNode.position.y + (en.offsetY || 0) + (savedExtra?.y || 0),
+            };
         result.push({
           id: en.id,
           type: en.type || 'thoughtBubble',
-          position: {
-            x: anchorNode.position.x + (en.offsetX || 420) + offset.x,
-            y: anchorNode.position.y + (en.offsetY || 0) + offset.y,
-          },
+          position: extraPos,
           data: en.data,
           draggable: true,
         });
@@ -2254,19 +2263,15 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         }
 
         const nd = positioned.find((n) => n.id === change.id);
-        if (nd) {
-          const rawY = change.position.y - nd.position.y;
+        if (nd || (sideNode && change.id === sideNode.id)) {
+          // Store absolute position so it survives base-position recalculations
+          const finalY = snapGridY
+            ? Math.round(change.position.y / snapGridY) * snapGridY
+            : change.position.y;
           dragOffsets.current[change.id] = {
-            x: change.position.x - nd.position.x,
-            y: snapGridY ? Math.round(rawY / snapGridY) * snapGridY : rawY,
-          };
-          setHasDragChanges(true);
-        } else if (sideNode && change.id === sideNode.id) {
-          const anchorNode = positioned[sideNodeYIndex] || positioned[positioned.length - 1];
-          const rawY = change.position.y - anchorNode.position.y;
-          dragOffsets.current[change.id] = {
-            x: change.position.x - (anchorNode.position.x + 470),
-            y: snapGridY ? Math.round(rawY / snapGridY) * snapGridY : rawY,
+            x: change.position.x,
+            y: finalY,
+            abs: true,
           };
           setHasDragChanges(true);
         } else {
