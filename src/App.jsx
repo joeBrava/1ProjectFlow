@@ -477,7 +477,63 @@ function SpanBar({ data }) {
   );
 }
 
-const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar };
+/* ═══════════════════════════════════════════════════════════════════════
+   TIMELINE PHASE — tall banner node showing a phase label, week range, etc.
+   ═══════════════════════════════════════════════════════════════════════ */
+function TimelinePhase({ data }) {
+  const accent = data.accentColor || colors.blue;
+  const height = data.phaseHeight || 200;
+  return (
+    <div
+      style={{
+        width: 120,
+        height,
+        background: `linear-gradient(180deg, ${accent}14, ${accent}06)`,
+        borderLeft: `3px solid ${accent}`,
+        borderRadius: 8,
+        padding: '12px 10px',
+        fontFamily: "'Inter', sans-serif",
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Week range badge at top */}
+      <span style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+        color: accent, textTransform: 'uppercase', marginBottom: 6,
+      }}>
+        {data.weekLabel}
+      </span>
+      {/* Phase title */}
+      <div style={{
+        fontSize: 12, fontWeight: 600, color: colors.text,
+        lineHeight: 1.3, marginBottom: 6,
+      }}>
+        {data.title}
+      </div>
+      {/* Duration tag */}
+      {data.duration && (
+        <span style={{
+          display: 'inline-block', fontSize: 8, fontWeight: 600,
+          padding: '2px 5px', borderRadius: 3,
+          background: `${accent}22`, color: accent,
+          alignSelf: 'flex-start',
+        }}>
+          {data.duration}
+        </span>
+      )}
+      {/* Vertical line indicator at the bottom */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: 3, background: `${accent}40`, borderRadius: '0 0 8px 8px',
+      }} />
+    </div>
+  );
+}
+
+const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar, timelinePhase: TimelinePhase };
 
 /* ═══════════════════════════════════════════════════════════════════════
    EDGE DEFAULTS
@@ -1401,6 +1457,68 @@ const productionEdges = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════
+   TIMELINE PHASE CONFIGS — defines the phases for each view
+   ═══════════════════════════════════════════════════════════════════════ */
+const productionTimelinePhases = [
+  { id: 'tl-prod-1', title: 'Handoff & Quoting', weekLabel: 'Wk 1', duration: '~1 week', accentColor: colors.orange, nodeIds: ['p-handoff', 'p-quotes'] },
+  { id: 'tl-prod-2', title: 'Test Build', weekLabel: 'Wk 2–3', duration: '1–2 weeks', accentColor: colors.purple, nodeIds: ['p-testbuild'] },
+  { id: 'tl-prod-3', title: 'Printables', weekLabel: 'Wk 3–6', duration: '~3 weeks', accentColor: colors.pink, nodeIds: ['p-stickers', 'p-finalrender', 'p-boxes', 'p-coverart', 'p-instructions', 'p-printfiles'] },
+  { id: 'tl-prod-4', title: 'Final Production', weekLabel: 'Wk 6–12', duration: '4–6 weeks', accentColor: '#94a3b8', nodeIds: ['p-finalprod', 'p-payment'] },
+  { id: 'tl-prod-5', title: 'Shipping & Close', weekLabel: 'Wk 12–14', duration: '~2 weeks', accentColor: colors.emerald, nodeIds: ['p-shipping', 'p-review'] },
+];
+
+const designTimelinePhases = [
+  { id: 'tl-des-1', title: 'Form Entry', weekLabel: 'Day 1', duration: '1 day', accentColor: colors.blue, nodeIds: ['b-form'] },
+  { id: 'tl-des-2', title: 'Automation & Assignment', weekLabel: 'Wk 1', duration: '~1 week', accentColor: colors.orange, nodeIds: ['b-firstrender'] },
+  { id: 'tl-des-3', title: 'Design Work', weekLabel: 'Wk 2–5', duration: '3–4 weeks', accentColor: colors.purple, nodeIds: ['b-designwork'] },
+  { id: 'tl-des-4', title: 'Approvals', weekLabel: 'Wk 5–6', duration: '~1 week', accentColor: colors.green, nodeIds: ['b-approved', 'b-docusign', 'b-signed'] },
+  { id: 'tl-des-5', title: 'Production Data', weekLabel: 'Wk 6–7', duration: '~1 week', accentColor: colors.pink, nodeIds: ['b-proddata', 'b-invoicepaid'] },
+  { id: 'tl-des-6', title: 'Production Setup', weekLabel: 'Wk 7–8', duration: '~1 week', accentColor: colors.lime, nodeIds: ['b-production', 'b-handoff'] },
+];
+
+/**
+ * Compute timeline phase node positions based on already-positioned flow nodes.
+ * Returns an array of React Flow node objects of type 'timelinePhase'.
+ */
+function computeTimelineNodes(phases, positionedNodes, xOffset) {
+  const posMap = {};
+  const hMap = {};
+  for (const nd of positionedNodes) {
+    posMap[nd.id] = nd.position;
+    hMap[nd.id] = nd.baseHeight || 140;
+  }
+
+  return phases.map((phase) => {
+    let minY = Infinity;
+    let maxYBottom = -Infinity;
+    for (const nid of phase.nodeIds) {
+      const pos = posMap[nid];
+      if (!pos) continue;
+      if (pos.y < minY) minY = pos.y;
+      const bottom = pos.y + (hMap[nid] || 140);
+      if (bottom > maxYBottom) maxYBottom = bottom;
+    }
+    if (minY === Infinity) return null;
+
+    const phaseHeight = Math.max(maxYBottom - minY, 60);
+    return {
+      id: phase.id,
+      type: 'timelinePhase',
+      position: { x: xOffset, y: minY },
+      data: {
+        title: phase.title,
+        weekLabel: phase.weekLabel,
+        duration: phase.duration,
+        accentColor: phase.accentColor,
+        phaseHeight,
+      },
+      draggable: false,
+      selectable: false,
+    };
+  }).filter(Boolean);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    PRODUCTION LAYOUT — handles parallel columns + span bar
    ═══════════════════════════════════════════════════════════════════════ */
 function computeProductionPositions(nodeDataList, expandedSet, xCenter) {
@@ -1525,7 +1643,7 @@ function computePositions(nodeDataList, expandedSet, xCenter) {
 /* ═══════════════════════════════════════════════════════════════════════
    FLOW WRAPPER — handles expand/collapse with dynamic repositioning
    ═══════════════════════════════════════════════════════════════════════ */
-function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId }) {
+function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, timelinePhases, timelineXOffset }) {
   const [expandedSet, setExpandedSet] = useState(new Set());
   const dragOffsets = useRef({});
 
@@ -1682,6 +1800,12 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
       }
     }
 
+    // Timeline phase banners
+    if (timelinePhases && timelineXOffset != null) {
+      const tlNodes = computeTimelineNodes(timelinePhases, positioned, timelineXOffset);
+      result.push(...tlNodes);
+    }
+
     // Sticky notes
     for (const note of stickyNotes) {
       const offset = dragOffsets.current[note.id] || { x: 0, y: 0 };
@@ -1702,7 +1826,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, timelinePhases, timelineXOffset]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -2044,6 +2168,8 @@ export default function App() {
             xCenter={400}
             extraNodes={designThoughtBubbles}
             extraEdges={designThoughtEdges}
+            timelinePhases={designTimelinePhases}
+            timelineXOffset={100}
           />
         ) : (
           <FlowView
@@ -2055,6 +2181,8 @@ export default function App() {
             sideNodeYIndex={0}
             xCenter={400}
             positionFn={computeProductionPositions}
+            timelinePhases={productionTimelinePhases}
+            timelineXOffset={-350}
           />
         )}
       </div>
