@@ -685,7 +685,64 @@ function TimelinePhase({ id, data }) {
   );
 }
 
-const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar, timelinePhase: TimelinePhase };
+/* ═══════════════════════════════════════════════════════════════════════
+   WEEK GRID — background node showing numbered week rows
+   ═══════════════════════════════════════════════════════════════════════ */
+function WeekGrid({ data }) {
+  const weeks = data.weeks || 14;
+  const rowH = data.rowHeight || 150;
+  const gridWidth = data.gridWidth || 1200;
+  return (
+    <div style={{
+      width: gridWidth,
+      height: weeks * rowH,
+      position: 'relative',
+      pointerEvents: 'none',
+      fontFamily: "'Inter', sans-serif",
+    }}>
+      {Array.from({ length: weeks }, (_, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          top: i * rowH,
+          left: 0,
+          width: '100%',
+          height: rowH,
+          display: 'flex',
+          alignItems: 'flex-start',
+          borderBottom: `1px solid ${colors.border}44`,
+          background: i % 2 === 0 ? 'transparent' : `${colors.surface}40`,
+        }}>
+          {/* Week label */}
+          <div style={{
+            width: 64,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            paddingTop: 10,
+            borderRight: `1px solid ${colors.border}44`,
+            flexShrink: 0,
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.08em', color: colors.textDim, marginBottom: 2,
+            }}>
+              Wk
+            </span>
+            <span style={{
+              fontSize: 18, fontWeight: 700, color: colors.textMuted,
+            }}>
+              {i + 1}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar, timelinePhase: TimelinePhase, weekGrid: WeekGrid };
 
 /* ═══════════════════════════════════════════════════════════════════════
    EDGE DEFAULTS
@@ -1051,6 +1108,8 @@ function AddNodeModal({ onSave, onCancel }) {
    TAB 1 — TECHNICAL FLOW (Stage 2 n8n workflow)
    ═══════════════════════════════════════════════════════════════════════ */
 const GAP = 50;
+const WEEK_HEIGHT = 150;
+const PROD_WEEKS = 14;
 
 function buildTechnicalNodeData() {
   return [
@@ -1416,11 +1475,11 @@ function buildBusinessEdges() {
    TAB 3 — PRODUCTION FLOW (post-handoff through shipping)
    ═══════════════════════════════════════════════════════════════════════ */
 function buildProductionNodeData() {
-  const pLabelStyle = { fill: colors.textDim, fontSize: 10, fontFamily: "'Inter', sans-serif" };
   return [
-    // ── Phase 1: center-top (linear before printables fork) ──
+    // ── Phase 1: Handoff & Quoting (Wk 1–2) ──
     {
-      id: 'p-handoff', col: 'center-top', baseHeight: 140, expandedExtra: 160,
+      id: 'p-handoff', col: 'center-top', weekStart: 0, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 160,
       data: {
         stageLabel: 'Step 1', title: 'Handoff Completed', icon: icons.handoff,
         accentColor: colors.orange, glowColor: colors.orangeGlow, badge: 'ENTRY',
@@ -1434,7 +1493,8 @@ function buildProductionNodeData() {
       },
     },
     {
-      id: 'p-quotes', col: 'center-top', baseHeight: 150, expandedExtra: 240,
+      id: 'p-quotes', col: 'center-top', weekStart: 1, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 240,
       data: {
         stageLabel: 'Step 2', title: 'Procurement Quotes', icon: icons.quotes,
         accentColor: colors.sky, glowColor: colors.skyGlow, badge: 'PROCUREMENT',
@@ -1453,8 +1513,10 @@ function buildProductionNodeData() {
         ],
       },
     },
+    // ── Phase 2: Test Build (Wk 3–4) ──
     {
-      id: 'p-testbuild', col: 'center-top', baseHeight: 150, expandedExtra: 240,
+      id: 'p-testbuild', col: 'center-top', weekStart: 2, weekSpan: 2,
+      baseHeight: WEEK_HEIGHT * 2, expandedExtra: 240,
       data: {
         stageLabel: 'Step 3', title: 'Test Build', icon: icons.testBuild,
         accentColor: colors.purple, glowColor: colors.purpleGlow, badge: '1-2 WEEKS',
@@ -1474,8 +1536,10 @@ function buildProductionNodeData() {
         ],
       },
     },
+    // ── Phase 3: Printables (Wk 5–8) ──
     {
-      id: 'p-stickers', col: 'center-top', baseHeight: 150, expandedExtra: 240,
+      id: 'p-stickers', col: 'center-top', weekStart: 4, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 240,
       data: {
         stageLabel: 'Step 4', title: 'Sticker Design', icon: icons.sticker,
         accentColor: colors.amber, glowColor: colors.amberGlow, badge: '~1 WEEK',
@@ -1494,9 +1558,10 @@ function buildProductionNodeData() {
         ],
       },
     },
-    // ── Phase 2L: printables left column ──
+    // Printables left column
     {
-      id: 'p-finalrender', col: 'left', baseHeight: 140, expandedExtra: 160,
+      id: 'p-finalrender', col: 'left', weekStart: 5, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 160,
       data: {
         stageLabel: 'Step 5', title: 'Final Render', icon: icons.render,
         accentColor: colors.pink, glowColor: colors.pinkGlow, badge: 'CLIENT APPROVAL',
@@ -1510,7 +1575,8 @@ function buildProductionNodeData() {
       },
     },
     {
-      id: 'p-boxes', col: 'left', baseHeight: 150, expandedExtra: 220,
+      id: 'p-boxes', col: 'left', weekStart: 6, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 220,
       data: {
         stageLabel: 'Step 6', title: 'Box Design', icon: icons.box,
         accentColor: colors.blue, glowColor: colors.blueGlow, badge: '~1 WEEK',
@@ -1531,7 +1597,8 @@ function buildProductionNodeData() {
       },
     },
     {
-      id: 'p-coverart', col: 'left', baseHeight: 140, expandedExtra: 180,
+      id: 'p-coverart', col: 'left', weekStart: 7, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 180,
       data: {
         stageLabel: 'Step 7', title: 'Instruction Cover Art', icon: icons.coverArt,
         accentColor: colors.indigo, glowColor: colors.indigoGlow, badge: '~1 WEEK',
@@ -1545,9 +1612,10 @@ function buildProductionNodeData() {
         ]}],
       },
     },
-    // ── Phase 2R: instruction steps (parallel) ──
+    // Printables right column (parallel)
     {
-      id: 'p-instructions', col: 'right', baseHeight: 150, expandedExtra: 200,
+      id: 'p-instructions', col: 'right', weekStart: 5, weekSpan: 3,
+      baseHeight: WEEK_HEIGHT * 3, expandedExtra: 200,
       data: {
         stageLabel: 'Step 6b', title: 'Instruction Steps', icon: icons.book,
         accentColor: colors.cyan, glowColor: colors.cyanGlow, badge: '~2 WEEKS',
@@ -1561,9 +1629,10 @@ function buildProductionNodeData() {
         ]}],
       },
     },
-    // ── Phase 3: printables merge ──
+    // Printables merge
     {
-      id: 'p-printfiles', col: 'center-mid', baseHeight: 140, expandedExtra: 160,
+      id: 'p-printfiles', col: 'center-mid', weekStart: 8, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 160,
       data: {
         stageLabel: 'Step 8', title: 'Printables Sent to Supplier', icon: icons.send,
         accentColor: colors.green, glowColor: colors.greenGlow, badge: 'PROCUREMENT',
@@ -1576,9 +1645,10 @@ function buildProductionNodeData() {
         ]}],
       },
     },
-    // ── Phase 4: Final Production (left, tall) + Payment (right, parallel) ──
+    // ── Phase 4: Final Production (Wk 9–12) + Payment ──
     {
-      id: 'p-finalprod', col: 'parallel-left', baseHeight: 200, expandedExtra: 240,
+      id: 'p-finalprod', col: 'parallel-left', weekStart: 9, weekSpan: 3,
+      baseHeight: WEEK_HEIGHT * 3, expandedExtra: 240,
       data: {
         stageLabel: 'Step 9', title: 'Final Production', icon: icons.factory,
         accentColor: '#94a3b8', glowColor: 'rgba(148, 163, 184, 0.15)', badge: 'DEAD ZONE',
@@ -1600,7 +1670,8 @@ function buildProductionNodeData() {
       },
     },
     {
-      id: 'p-payment', col: 'parallel-right', baseHeight: 150, expandedExtra: 200,
+      id: 'p-payment', col: 'parallel-right', weekStart: 10, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 200,
       data: {
         stageLabel: 'Step 10', title: 'Final 50% Payment', icon: icons.invoice,
         accentColor: colors.sky, glowColor: colors.skyGlow, badge: '2 WKS BEFORE FRD',
@@ -1616,9 +1687,10 @@ function buildProductionNodeData() {
         ],
       },
     },
-    // ── Phase 5: final linear (shipping → review) ──
+    // ── Phase 5: Shipping & Close (Wk 12–14) ──
     {
-      id: 'p-shipping', col: 'center-final', baseHeight: 150, expandedExtra: 260,
+      id: 'p-shipping', col: 'center-final', weekStart: 12, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 260,
       data: {
         stageLabel: 'Step 11', title: 'Shipping & Delivery', icon: icons.truck,
         accentColor: colors.orange, glowColor: colors.orangeGlow, badge: 'LOGISTICS',
@@ -1639,7 +1711,8 @@ function buildProductionNodeData() {
       },
     },
     {
-      id: 'p-review', col: 'center-final', baseHeight: 140, expandedExtra: 160,
+      id: 'p-review', col: 'center-final', weekStart: 13, weekSpan: 1,
+      baseHeight: WEEK_HEIGHT, expandedExtra: 160,
       data: {
         stageLabel: 'Step 12', title: 'After Action Review', icon: icons.clipboard,
         accentColor: colors.emerald, glowColor: colors.emeraldGlow, badge: 'CLOSE-OUT',
@@ -1652,9 +1725,10 @@ function buildProductionNodeData() {
         ]}],
       },
     },
-    // ── Brick Production span bar (positioned by layout, rendered as SpanBar) ──
+    // ── Brick Production span bar ──
     {
-      id: 'p-brickprod', col: 'span-left', baseHeight: 0, expandedExtra: 0,
+      id: 'p-brickprod', col: 'span-left', weekStart: 4, weekSpan: 9,
+      baseHeight: 0, expandedExtra: 0,
       data: {
         stageLabel: 'Background', title: 'Brick Production', icon: icons.factory,
         accentColor: '#94a3b8', badge: 'SUPPLIER',
@@ -1697,11 +1771,11 @@ const productionEdges = [
    TIMELINE PHASE CONFIGS — defines the phases for each view
    ═══════════════════════════════════════════════════════════════════════ */
 const productionTimelinePhases = [
-  { id: 'tl-prod-1', title: 'Handoff & Quoting', weekLabel: 'Wk 1', duration: '~1 week', accentColor: colors.orange, nodeIds: ['p-handoff', 'p-quotes'] },
-  { id: 'tl-prod-2', title: 'Test Build', weekLabel: 'Wk 2–3', duration: '1–2 weeks', accentColor: colors.purple, nodeIds: ['p-testbuild'] },
-  { id: 'tl-prod-3', title: 'Printables', weekLabel: 'Wk 3–6', duration: '~3 weeks', accentColor: colors.pink, nodeIds: ['p-stickers', 'p-finalrender', 'p-boxes', 'p-coverart', 'p-instructions', 'p-printfiles'] },
-  { id: 'tl-prod-4', title: 'Final Production', weekLabel: 'Wk 6–12', duration: '4–6 weeks', accentColor: '#94a3b8', nodeIds: ['p-finalprod', 'p-payment'] },
-  { id: 'tl-prod-5', title: 'Shipping & Close', weekLabel: 'Wk 12–14', duration: '~2 weeks', accentColor: colors.emerald, nodeIds: ['p-shipping', 'p-review'] },
+  { id: 'tl-prod-1', title: 'Handoff & Quoting', weekLabel: 'Wk 1–2', duration: '~2 weeks', accentColor: colors.orange, nodeIds: ['p-handoff', 'p-quotes'] },
+  { id: 'tl-prod-2', title: 'Test Build', weekLabel: 'Wk 3–4', duration: '1–2 weeks', accentColor: colors.purple, nodeIds: ['p-testbuild'] },
+  { id: 'tl-prod-3', title: 'Printables', weekLabel: 'Wk 5–9', duration: '~4 weeks', accentColor: colors.pink, nodeIds: ['p-stickers', 'p-finalrender', 'p-boxes', 'p-coverart', 'p-instructions', 'p-printfiles'] },
+  { id: 'tl-prod-4', title: 'Final Production', weekLabel: 'Wk 10–12', duration: '3–4 weeks', accentColor: '#94a3b8', nodeIds: ['p-finalprod', 'p-payment'] },
+  { id: 'tl-prod-5', title: 'Shipping & Close', weekLabel: 'Wk 13–14', duration: '~2 weeks', accentColor: colors.emerald, nodeIds: ['p-shipping', 'p-review'] },
 ];
 
 const designTimelinePhases = [
@@ -1780,111 +1854,38 @@ function computeTimelineNodes(phases, positionedNodes, xOffset, callbacks) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   PRODUCTION LAYOUT — handles parallel columns + span bar
+   PRODUCTION LAYOUT — week-based grid (Y = weekStart × WEEK_HEIGHT)
    ═══════════════════════════════════════════════════════════════════════ */
 function computeProductionPositions(nodeDataList, expandedSet, xCenter) {
   const leftX = xCenter - 210;
   const rightX = xCenter + 210;
   const spanLeftX = xCenter - 480;
-  const positions = {};
-  const heights = {};
-  let y = 0;
 
-  const measure = (nd) => {
-    const isExpanded = expandedSet.has(nd.id);
-    return nd.baseHeight + (isExpanded ? nd.expandedExtra : 0);
+  // Column X mapping
+  const colX = {
+    'center-top': xCenter,
+    'left': leftX,
+    'right': rightX,
+    'center-mid': xCenter,
+    'parallel-left': leftX,
+    'parallel-right': rightX,
+    'center-final': xCenter,
+    'span-left': spanLeftX,
   };
 
-  // Phase 1: center-top
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'center-top') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: xCenter, y };
-    heights[nd.id] = h;
-    y += h + GAP;
-  }
-
-  const forkY = y;
-  let leftY = forkY;
-  let rightY = forkY;
-
-  // Phase 2L: printables left column
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'left') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: leftX, y: leftY };
-    heights[nd.id] = h;
-    leftY += h + GAP;
-  }
-
-  // Phase 2R: printables right column
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'right') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: rightX, y: rightY };
-    heights[nd.id] = h;
-    rightY += h + GAP;
-  }
-
-  // Phase 3: center-mid (printfiles merge point)
-  y = Math.max(leftY, rightY);
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'center-mid') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: xCenter, y };
-    heights[nd.id] = h;
-    y += h + GAP;
-  }
-
-  // Phase 4: parallel-left (final prod, tall) + parallel-right (payment)
-  const parallelY = y;
-  let parallelLeftY = parallelY;
-  let parallelRightY = parallelY;
-
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'parallel-left') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: leftX, y: parallelLeftY };
-    heights[nd.id] = h;
-    parallelLeftY += h + GAP;
-  }
-
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'parallel-right') continue;
-    const h = measure(nd);
-    // Offset down slightly to visually show payment is triggered during production
-    positions[nd.id] = { x: rightX, y: parallelY + 40 };
-    heights[nd.id] = h;
-    parallelRightY = parallelY + 40 + h + GAP;
-  }
-
-  // Phase 5: center-final (shipping, review)
-  y = Math.max(parallelLeftY, parallelRightY);
-  for (const nd of nodeDataList) {
-    if (nd.col !== 'center-final') continue;
-    const h = measure(nd);
-    positions[nd.id] = { x: xCenter, y };
-    heights[nd.id] = h;
-    y += h + GAP;
-  }
-
-  // Span-left: Brick Production bar (from stickers Y down to shipping bottom)
-  const stickersPos = positions['p-stickers'];
-  const shippingPos = positions['p-shipping'];
-  const shippingH = heights['p-shipping'] || 150;
-  if (stickersPos && shippingPos) {
-    const spanHeight = (shippingPos.y + shippingH) - stickersPos.y;
-    for (const nd of nodeDataList) {
-      if (nd.col !== 'span-left') continue;
-      positions[nd.id] = { x: spanLeftX, y: stickersPos.y };
+  return nodeDataList.map((nd) => {
+    if (nd.col === 'span-left') {
+      // Span bar: position and height derived from weekStart/weekSpan
+      const spanY = (nd.weekStart || 0) * WEEK_HEIGHT;
+      const spanHeight = (nd.weekSpan || 9) * WEEK_HEIGHT;
       nd._spanHeight = spanHeight;
+      return { ...nd, position: { x: colX['span-left'], y: spanY } };
     }
-  }
 
-  return nodeDataList.map((nd) => ({
-    ...nd,
-    position: positions[nd.id] || { x: xCenter, y: 0 },
-  }));
+    const x = colX[nd.col] ?? xCenter;
+    const y = (nd.weekStart || 0) * WEEK_HEIGHT;
+    return { ...nd, position: { x, y } };
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1904,7 +1905,7 @@ function computePositions(nodeDataList, expandedSet, xCenter) {
 /* ═══════════════════════════════════════════════════════════════════════
    FLOW WRAPPER — handles expand/collapse with dynamic repositioning
    ═══════════════════════════════════════════════════════════════════════ */
-function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, timelinePhases, timelineXOffset }) {
+function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, timelinePhases, timelineXOffset, weekGrid, snapGridY }) {
   const [expandedSet, setExpandedSet] = useState(new Set());
   const dragOffsets = useRef({});
 
@@ -2026,7 +2027,23 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   const positioned = useMemo(() => layoutFn(editorNodes, expandedSet, xCenter), [layoutFn, editorNodes, expandedSet, xCenter]);
 
   const buildNodes = useCallback(() => {
-    const result = positioned.map((nd) => {
+    const result = [];
+
+    // Week grid background (rendered first = behind everything)
+    if (weekGrid) {
+      result.push({
+        id: '__week-grid__',
+        type: 'weekGrid',
+        position: { x: weekGrid.x, y: 0 },
+        data: { weeks: weekGrid.weeks, rowHeight: weekGrid.rowHeight, gridWidth: weekGrid.gridWidth },
+        draggable: false,
+        selectable: false,
+        focusable: false,
+        style: { zIndex: -1 },
+      });
+    }
+
+    result.push(...positioned.map((nd) => {
       const offset = dragOffsets.current[nd.id] || { x: 0, y: 0 };
       const isSpanBar = nd.col === 'span-left';
       const nodeData = isSpanBar
@@ -2046,7 +2063,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         position: { x: nd.position.x + offset.x, y: nd.position.y + offset.y },
         data: nodeData,
       };
-    });
+    }));
 
     // Side node (writeback, etc.)
     if (sideNode) {
@@ -2114,7 +2131,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete, weekGrid]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
@@ -2187,7 +2204,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         onEdgeClick={handleEdgeClick}
         nodeTypes={nodeTypes}
         snapToGrid
-        snapGrid={[20, 50]}
+        snapGrid={[20, snapGridY || 50]}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         minZoom={0.2}
@@ -2482,6 +2499,8 @@ export default function App() {
             positionFn={computeProductionPositions}
             timelinePhases={productionTimelinePhases}
             timelineXOffset={-350}
+            snapGridY={WEEK_HEIGHT}
+            weekGrid={{ x: -550, weeks: PROD_WEEKS, rowHeight: WEEK_HEIGHT, gridWidth: 1300 }}
           />
         )}
       </div>
