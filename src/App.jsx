@@ -1108,7 +1108,7 @@ function AddNodeModal({ onSave, onCancel }) {
    TAB 1 — TECHNICAL FLOW (Stage 2 n8n workflow)
    ═══════════════════════════════════════════════════════════════════════ */
 const GAP = 50;
-const WEEK_HEIGHT = 150;
+const WEEK_HEIGHT = 300;
 const PROD_WEEKS = 14;
 
 function buildTechnicalNodeData() {
