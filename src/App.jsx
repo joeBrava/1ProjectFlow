@@ -534,6 +534,7 @@ const TIMELINE_COLORS = [
 function TimelinePhase({ id, data }) {
   const accent = data.accentColor || colors.blue;
   const height = data.phaseHeight || 200;
+  const width = data.phaseWidth || 120;
   const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(data.title);
@@ -577,7 +578,7 @@ function TimelinePhase({ id, data }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: 120,
+        width,
         height,
         background: `linear-gradient(180deg, ${accent}14, ${accent}06)`,
         borderLeft: `3px solid ${accent}`,
@@ -607,11 +608,12 @@ function TimelinePhase({ id, data }) {
         </div>
       )}
 
-      {/* Resize handle */}
+      {/* Vertical resize handle — bottom edge */}
       {hovered && !editing && (
         <div
+          className="nodrag nopan"
           onMouseEnter={() => setHovered(true)}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
             const startY = e.clientY;
@@ -623,18 +625,57 @@ function TimelinePhase({ id, data }) {
               if (data._onUpdate) data._onUpdate(id, { _heightOverride: newH });
             };
             const onUp = () => {
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
             };
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
           }}
           style={{
             position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
-            width: 30, height: 6, borderRadius: 3,
-            background: accent, cursor: 'ns-resize', opacity: 0.7, zIndex: 10,
+            width: 40, height: 10, borderRadius: 5,
+            background: `${accent}66`, cursor: 'ns-resize', zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
           }}
-        />
+        >
+          <div style={{ width: 20, height: 2, borderRadius: 1, background: accent }} />
+        </div>
+      )}
+
+      {/* Horizontal resize handle — right edge */}
+      {hovered && !editing && (
+        <div
+          className="nodrag nopan"
+          onMouseEnter={() => setHovered(true)}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = width;
+            const onMove = (ev) => {
+              const delta = ev.clientX - startX;
+              const snapped = Math.round((startW + delta) / 50) * 50;
+              const newW = Math.max(80, snapped);
+              if (data._onUpdate) data._onUpdate(id, { _widthOverride: newW });
+            };
+            const onUp = () => {
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+          }}
+          style={{
+            position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)',
+            width: 10, height: 40, borderRadius: 5,
+            background: `${accent}66`, cursor: 'ew-resize', zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ width: 2, height: 20, borderRadius: 1, background: accent }} />
+        </div>
       )}
 
       {editing ? (
@@ -1898,6 +1939,7 @@ function computeTimelineNodes(phases, positionedNodes, xOffset, callbacks) {
         duration: phase.duration,
         accentColor: phase.accentColor,
         phaseHeight,
+        phaseWidth: phase._widthOverride || undefined,
         _onUpdate: callbacks?.onUpdate,
         _onDelete: callbacks?.onDelete,
       },
