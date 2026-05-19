@@ -2383,12 +2383,9 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
 
           const nd = positioned.find((n) => n.id === change.id);
           if (nd || (sideNode && change.id === sideNode.id)) {
-            const finalY = snapGridY
-              ? Math.round(change.position.y / snapGridY) * snapGridY
-              : change.position.y;
             dragOffsets.current[change.id] = {
               x: change.position.x,
-              y: finalY,
+              y: change.position.y,
               abs: true,
             };
             setHasDragChanges(true);
@@ -2398,7 +2395,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         }
       }
     }
-  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes, snapGridY]);
+  }, [onNodesChange, positioned, sideNode, sideNodeYIndex, stickyNotes]);
 
   return (
     <>
