@@ -123,7 +123,8 @@ function StageNode({ id, data }) {
 
   const hasExpandableContent = data.nodes || data.apis || data.keyData || data.details;
   const resolvedIcon = data.icon || (data.iconKey && icons[data.iconKey]) || null;
-  const nodeHeight = data._customHeight;
+  const nodeHeight = data._customHeight || data._spanHeight;
+  const nodeWidth = data._customWidth || 360;
 
   return (
     <div
@@ -135,8 +136,9 @@ function StageNode({ id, data }) {
         border: `1px solid ${expanded ? accentColor : colors.border}`,
         borderRadius: 12,
         padding: 0,
-        width: 360,
-        minHeight: nodeHeight || undefined,
+        width: nodeWidth,
+        height: nodeHeight || undefined,
+        overflow: nodeHeight ? 'hidden' : undefined,
         cursor: hasExpandableContent ? 'pointer' : 'default',
         boxShadow: expanded
           ? `0 0 20px ${glowColor}, 0 4px 24px rgba(0,0,0,0.4)`
@@ -195,6 +197,39 @@ function StageNode({ id, data }) {
           }}
         >
           <div style={{ width: 24, height: 2, borderRadius: 1, background: accentColor }} />
+        </div>
+      )}
+
+      {/* horizontal resize handle — right edge (visible on hover) */}
+      {hovered && data._onResizeWidth && (
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = nodeWidth;
+            const handleMove = (me) => {
+              const delta = me.clientX - startX;
+              const nw = Math.max(200, Math.round((startW + delta) / 50) * 50);
+              data._onResizeWidth(id, nw);
+            };
+            const handleUp = () => {
+              window.removeEventListener('mousemove', handleMove);
+              window.removeEventListener('mouseup', handleUp);
+            };
+            window.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleUp);
+          }}
+          style={{
+            position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)',
+            width: 12, height: 50, borderRadius: 6, zIndex: 10,
+            background: `${accentColor}66`, cursor: 'ew-resize',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ width: 2, height: 24, borderRadius: 1, background: accentColor }} />
         </div>
       )}
 
@@ -292,6 +327,7 @@ function StageNode({ id, data }) {
       {data.handleRight && <Handle type="source" position={Position.Right} id="right" style={{ background: accentColor, width: 8, height: 8, border: `2px solid ${colors.surface}` }} />}
       {data.handleLeft && <Handle type="target" position={Position.Left} id="left" style={{ background: accentColor, width: 8, height: 8, border: `2px solid ${colors.surface}` }} />}
       {data.handleLeftSource && <Handle type="source" position={Position.Left} id="left-source" style={{ background: accentColor, width: 8, height: 8, border: `2px solid ${colors.surface}` }} />}
+      {data.handleRightTarget && <Handle type="target" position={Position.Right} id="right" style={{ background: accentColor, width: 8, height: 8, border: `2px solid ${colors.surface}` }} />}
     </div>
   );
 }
@@ -779,7 +815,7 @@ function useFlowEditor(viewId, defaultNodes, defaultEdges) {
     result = result.map((n) => {
       const ov = (edits.nodeOverrides || {})[n.id];
       if (!ov) return n;
-      return { ...n, baseHeight: ov.baseHeight ?? n.baseHeight, _originalBaseHeight: n.baseHeight };
+      return { ...n, baseHeight: ov.baseHeight ?? n.baseHeight, baseWidth: ov.baseWidth ?? n.baseWidth, _originalBaseHeight: n.baseHeight };
     });
     for (const added of edits.addedNodes || []) {
       const node = { ...added, data: { ...added.data, icon: icons[added.data.iconKey] || icons.stage } };
@@ -854,7 +890,6 @@ function useFlowEditor(viewId, defaultNodes, defaultEdges) {
   const updateNodeHeight = useCallback((nodeId, baseHeight) => {
     setEdits((prev) => {
       const s = prev || { addedNodes: [], deletedNodeIds: [], nodeOverrides: {}, addedEdges: [], deletedEdgeIds: [] };
-      // Also update addedNodes if this is a user-added node
       const addedIdx = (s.addedNodes || []).findIndex((n) => n.id === nodeId);
       if (addedIdx >= 0) {
         const updated = [...s.addedNodes];
@@ -868,13 +903,29 @@ function useFlowEditor(viewId, defaultNodes, defaultEdges) {
     });
   }, []);
 
+  const updateNodeWidth = useCallback((nodeId, baseWidth) => {
+    setEdits((prev) => {
+      const s = prev || { addedNodes: [], deletedNodeIds: [], nodeOverrides: {}, addedEdges: [], deletedEdgeIds: [] };
+      const addedIdx = (s.addedNodes || []).findIndex((n) => n.id === nodeId);
+      if (addedIdx >= 0) {
+        const updated = [...s.addedNodes];
+        updated[addedIdx] = { ...updated[addedIdx], baseWidth };
+        return { ...s, addedNodes: updated };
+      }
+      return {
+        ...s,
+        nodeOverrides: { ...(s.nodeOverrides || {}), [nodeId]: { ...(s.nodeOverrides || {})[nodeId], baseWidth } },
+      };
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setEdits(null);
   }, []);
 
   const hasEdits = edits !== null;
 
-  return { nodes, edges, addNode, deleteNode, updateNodeHeight, resetAll, hasEdits };
+  return { nodes, edges, addNode, deleteNode, updateNodeHeight, updateNodeWidth, resetAll, hasEdits };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1725,14 +1776,15 @@ function buildProductionNodeData() {
         ]}],
       },
     },
-    // ── Brick Production span bar ──
+    // ── Brick Production (was span bar, now regular stage node) ──
     {
       id: 'p-brickprod', col: 'span-left', weekStart: 4, weekSpan: 9,
-      baseHeight: 0, expandedExtra: 0,
+      baseHeight: WEEK_HEIGHT * 9, expandedExtra: 0,
       data: {
         stageLabel: 'Background', title: 'Brick Production', icon: icons.factory,
-        accentColor: '#94a3b8', badge: 'SUPPLIER',
+        accentColor: '#94a3b8', glowColor: 'rgba(148, 163, 184, 0.08)', badge: 'SUPPLIER',
         summary: 'Bricks produced at supplier factory. Runs in parallel from test build approval through final production and shipping.',
+        handleTop: false, handleBottom: false, handleRightTarget: true,
       },
     },
   ];
@@ -1932,7 +1984,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
   // ── Editor state (persisted add/delete/resize) ──
   // Destructure to get stable refs — the object itself is recreated every render
   const editor = useFlowEditor(viewId, nodeDataList, edgeList);
-  const { nodes: editorNodes, edges: editorEdges, addNode: editorAddNode, deleteNode: editorDeleteNode, updateNodeHeight: editorUpdateHeight, resetAll: editorReset, hasEdits: editorHasEdits } = editor;
+  const { nodes: editorNodes, edges: editorEdges, addNode: editorAddNode, deleteNode: editorDeleteNode, updateNodeHeight: editorUpdateHeight, updateNodeWidth: editorUpdateWidth, resetAll: editorReset, hasEdits: editorHasEdits } = editor;
   const [showAddModal, setShowAddModal] = useState(false);
   const [insertEdgeCtx, setInsertEdgeCtx] = useState(null); // { edgeId, sourceId, targetId }
 
@@ -2006,6 +2058,10 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     editorUpdateHeight(nodeId, newHeight);
   }, [editorUpdateHeight]);
 
+  const handleResizeWidth = useCallback((nodeId, newWidth) => {
+    editorUpdateWidth(nodeId, newWidth);
+  }, [editorUpdateWidth]);
+
   // For addNodeSave we need editorNodes which changes — use a ref
   const editorNodesRef = useRef(editorNodes);
   editorNodesRef.current = editorNodes;
@@ -2065,21 +2121,21 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
 
     result.push(...positioned.map((nd) => {
       const offset = dragOffsets.current[nd.id] || { x: 0, y: 0 };
-      const isSpanBar = nd.col === 'span-left';
-      const nodeData = isSpanBar
-        ? { ...nd.data, spanHeight: nd._spanHeight || 400 }
-        : {
-            ...nd.data,
-            _expanded: expandedSet.has(nd.id),
-            _onToggle: onToggle,
-            _onDelete: handleDeleteNode,
-            _onResize: handleResizeNode,
-            _customHeight: nd.baseHeight > (nd._originalBaseHeight || nd.baseHeight) ? nd.baseHeight : undefined,
-            _baseHeight: nd.baseHeight,
-          };
+      const nodeData = {
+        ...nd.data,
+        _expanded: expandedSet.has(nd.id),
+        _onToggle: onToggle,
+        _onDelete: handleDeleteNode,
+        _onResize: handleResizeNode,
+        _onResizeWidth: handleResizeWidth,
+        _customHeight: nd._originalBaseHeight ? nd.baseHeight : undefined,
+        _baseHeight: nd.baseHeight || nd._spanHeight || 150,
+        _customWidth: nd.baseWidth || undefined,
+        _spanHeight: nd._spanHeight,
+      };
       return {
         id: nd.id,
-        type: isSpanBar ? 'spanBar' : 'stage',
+        type: 'stage',
         position: { x: nd.position.x + offset.x, y: nd.position.y + offset.y },
         data: nodeData,
       };
@@ -2099,6 +2155,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
           _onToggle: onToggle,
           _onDelete: handleDeleteNode,
           _onResize: handleResizeNode,
+          _onResizeWidth: handleResizeWidth,
           _baseHeight: 150,
         },
       });
@@ -2151,7 +2208,7 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
     }
 
     return result;
-  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete, weekGrid]);
+  }, [positioned, expandedSet, onToggle, handleDeleteNode, handleResizeNode, handleResizeWidth, sideNode, sideNodeYIndex, extraNodes, stickyNotes, updateNoteText, deleteNote, cycleNoteColor, tlPhases, timelineXOffset, handleTlUpdate, handleTlDelete, weekGrid]);
 
   const allEdges = useMemo(() => {
     const e = [...editorEdges];
