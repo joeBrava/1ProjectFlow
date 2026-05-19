@@ -1873,9 +1873,12 @@ function computeProductionPositions(nodeDataList, expandedSet, xCenter) {
     'span-left': spanLeftX,
   };
 
+  // Centering offset: nudge nodes toward the middle of their week row(s)
+  const NODE_VISUAL_H = 150; // approximate rendered height of an unexpanded node
+  const centerPad = (WEEK_HEIGHT - NODE_VISUAL_H) / 2;
+
   return nodeDataList.map((nd) => {
     if (nd.col === 'span-left') {
-      // Span bar: position and height derived from weekStart/weekSpan
       const spanY = (nd.weekStart || 0) * WEEK_HEIGHT;
       const spanHeight = (nd.weekSpan || 9) * WEEK_HEIGHT;
       nd._spanHeight = spanHeight;
@@ -1883,7 +1886,7 @@ function computeProductionPositions(nodeDataList, expandedSet, xCenter) {
     }
 
     const x = colX[nd.col] ?? xCenter;
-    const y = (nd.weekStart || 0) * WEEK_HEIGHT;
+    const y = (nd.weekStart || 0) * WEEK_HEIGHT + centerPad;
     return { ...nd, position: { x, y } };
   });
 }
@@ -1907,7 +1910,22 @@ function computePositions(nodeDataList, expandedSet, xCenter) {
    ═══════════════════════════════════════════════════════════════════════ */
 function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, positionFn, extraNodes, extraEdges, viewId, timelinePhases, timelineXOffset, weekGrid, snapGridY }) {
   const [expandedSet, setExpandedSet] = useState(new Set());
-  const dragOffsets = useRef({});
+
+  // ── Drag offsets (restored from localStorage on mount) ──
+  const dragKey = `flow-drag-${viewId || 'default'}`;
+  const dragOffsets = useRef(() => {
+    try { const s = localStorage.getItem(dragKey); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  // Initialize ref value from the factory on first render
+  if (typeof dragOffsets.current === 'function') {
+    dragOffsets.current = dragOffsets.current();
+  }
+  const [hasDragChanges, setHasDragChanges] = useState(false);
+
+  const handleSaveLayout = useCallback(() => {
+    localStorage.setItem(dragKey, JSON.stringify(dragOffsets.current));
+    setHasDragChanges(false);
+  }, [dragKey]);
 
   // ── Editor state (persisted add/delete/resize) ──
   // Destructure to get stable refs — the object itself is recreated every render
@@ -2181,12 +2199,14 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
             x: change.position.x - nd.position.x,
             y: change.position.y - nd.position.y,
           };
+          setHasDragChanges(true);
         } else if (sideNode && change.id === sideNode.id) {
           const anchorNode = positioned[sideNodeYIndex] || positioned[positioned.length - 1];
           dragOffsets.current[change.id] = {
             x: change.position.x - (anchorNode.position.x + 470),
             y: change.position.y - anchorNode.position.y,
           };
+          setHasDragChanges(true);
         } else {
           dragOffsets.current[change.id] = { x: 0, y: 0 };
         }
@@ -2224,8 +2244,11 @@ function FlowView({ nodeDataList, edgeList, sideNode, sideNodeYIndex, xCenter, p
         {timelinePhases && (
           <button onClick={handleAddPhase} className="toolbar-btn" title="Add a new timeline phase" style={{ borderColor: colors.purple, color: colors.purple }}>+ Phase</button>
         )}
+        {hasDragChanges && (
+          <button onClick={handleSaveLayout} className="toolbar-btn" title="Save current layout positions" style={{ borderColor: colors.emerald, color: colors.emerald }}>Save Layout</button>
+        )}
         {(editorHasEdits || tlHasEdits) && (
-          <button onClick={() => { editorReset(); tlReset(); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
+          <button onClick={() => { editorReset(); tlReset(); localStorage.removeItem(dragKey); dragOffsets.current = {}; setHasDragChanges(false); }} className="toolbar-btn toolbar-btn-danger" title="Reset all edits back to defaults">Reset All</button>
         )}
       </div>
 
