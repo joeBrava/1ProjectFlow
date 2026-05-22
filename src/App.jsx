@@ -2999,9 +2999,9 @@ const DECISION_TREE_ROOT = 'q-mfonly';
 /**
  * Walk the decision tree along the given answer path.
  * Returns:
- *   - { kind: 'question', node, depth }   when the path stops at a question waiting to be answered
- *   - { kind: 'leaf',     leaf,  depth }  when the path ends at a project-type leaf
- * `chain` is the ordered list of decision-tree nodes traversed (including the active one).
+ *   - { kind: 'question', node, depth, chain }   when the path stops at a question waiting to be answered
+ *   - { kind: 'leaf',     leaf,  depth, chain }  when the path ends at a project-type leaf
+ * `chain` is the ordered list of { node, answeredValue } entries traversed (including the active one).
  */
 function walkTree(tree, root, path) {
   const chain = [];
@@ -3009,8 +3009,8 @@ function walkTree(tree, root, path) {
   let depth = 0;
   while (currentId) {
     const node = tree[currentId];
-    chain.push({ node, answeredValue: path[depth] });
     const answerValue = path[depth];
+    chain.push({ node, answeredValue: answerValue });
     if (answerValue === undefined) {
       return { kind: 'question', node, depth, chain };
     }
