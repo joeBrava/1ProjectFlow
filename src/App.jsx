@@ -3327,8 +3327,6 @@ function buildProjectTypeGraph(path, { getWeeks, onAnswer, onRewind, onWeeksChan
       type: 'decisionNode',
       position: { x: idx * COL_WIDTH, y: Y },
       data,
-      draggable: false,
-      selectable: false,
     });
     if (idx > 0) {
       const prev = chain[idx - 1];
@@ -3356,8 +3354,6 @@ function buildProjectTypeGraph(path, { getWeeks, onAnswer, onRewind, onWeeksChan
         weeks: getWeeks(leaf.id, leaf.weeks),
         onWeeksChange: (w) => onWeeksChange(leaf.id, w),
       },
-      draggable: false,
-      selectable: false,
     });
     const lastDecision = chain[chain.length - 1];
     edges.push({
@@ -3419,9 +3415,6 @@ function ProjectTypeFlowView({ viewId }) {
         fitViewOptions={{ padding: 0.4 }}
         minZoom={0.3}
         maxZoom={1.5}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
         style={{ background: colors.bg }}
       >
