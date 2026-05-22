@@ -2996,6 +2996,44 @@ const DECISION_TREE = {
 
 const DECISION_TREE_ROOT = 'q-mfonly';
 
+/**
+ * Walk the decision tree along the given answer path.
+ * Returns:
+ *   - { kind: 'question', node, depth }   when the path stops at a question waiting to be answered
+ *   - { kind: 'leaf',     leaf,  depth }  when the path ends at a project-type leaf
+ * `chain` is the ordered list of decision-tree nodes traversed (including the active one).
+ */
+function walkTree(tree, root, path) {
+  const chain = [];
+  let currentId = root;
+  let depth = 0;
+  while (currentId) {
+    const node = tree[currentId];
+    chain.push({ node, answeredValue: path[depth] });
+    const answerValue = path[depth];
+    if (answerValue === undefined) {
+      return { kind: 'question', node, depth, chain };
+    }
+    const answer = node.answers.find((a) => a.value === answerValue);
+    if (!answer) {
+      // Stale path (e.g., catalog changed) — treat as if not yet answered.
+      chain[chain.length - 1].answeredValue = undefined;
+      return { kind: 'question', node, depth, chain };
+    }
+    if (typeof answer.next === 'string') {
+      currentId = answer.next;
+      depth += 1;
+    } else if (answer.next && answer.next.leaf) {
+      const leaf = PROJECT_TYPES_BY_ID[answer.next.leaf];
+      return { kind: 'leaf', leaf, depth: depth + 1, chain };
+    } else {
+      // Defensive: malformed tree.
+      return { kind: 'question', node, depth, chain };
+    }
+  }
+  return { kind: 'question', node: tree[root], depth: 0, chain };
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
