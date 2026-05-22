@@ -3110,6 +3110,7 @@ function DecisionNode({ id, data }) {
   const isActive = data.state === 'active';
   return (
     <div
+      className="nodrag nopan"
       style={{
         width: 240,
         background: colors.surface,
@@ -3202,6 +3203,7 @@ function ProjectTypeCard({ id, data }) {
 
   return (
     <div
+      className="nodrag nopan"
       style={{
         width: 280,
         background: colors.surface,
