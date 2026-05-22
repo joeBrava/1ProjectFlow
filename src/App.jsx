@@ -2883,6 +2883,119 @@ const designThoughtEdges = [
   },
 ];
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PROJECT TYPE DECISION TREE — static data
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// 15 project type leaves. `weeks` values are placeholders; edit later via the UI.
+const PROJECT_TYPES = [
+  // Minifig-only branch (3)
+  { id: 'mf-only-std', code: 'MF-STD', name: 'Minifig-Only · Standard',  weeks: 6,
+    axes: { minifigOnly: true, brand: null, timeframe: 'std', minifigs: null } },
+  { id: 'mf-only-exp', code: 'MF-EXP', name: 'Minifig-Only · Expedited', weeks: 4,
+    axes: { minifigOnly: true, brand: null, timeframe: 'exp', minifigs: null } },
+  { id: 'mf-only-ext', code: 'MF-EXT', name: 'Minifig-Only · Extended',  weeks: 8,
+    axes: { minifigOnly: true, brand: null, timeframe: 'ext', minifigs: null } },
+
+  // LEGO branch (6)
+  { id: 'lego-std-none', code: 'LEGO-STD',    name: 'LEGO · Standard',                weeks: 14,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'none' } },
+  { id: 'lego-std-mf',   code: 'LEGO-STD-MF', name: 'LEGO · Standard · w/ Minifigs',  weeks: 14,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'incl' } },
+  { id: 'lego-exp-none', code: 'LEGO-EXP',    name: 'LEGO · Expedited',               weeks: 8,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'none' } },
+  { id: 'lego-exp-mf',   code: 'LEGO-EXP-MF', name: 'LEGO · Expedited · w/ Minifigs', weeks: 8,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'incl' } },
+  { id: 'lego-ext-none', code: 'LEGO-EXT',    name: 'LEGO · Extended',                weeks: 20,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'none' } },
+  { id: 'lego-ext-mf',   code: 'LEGO-EXT-MF', name: 'LEGO · Extended · w/ Minifigs',  weeks: 20,
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'incl' } },
+
+  // Compatible branch (6)
+  { id: 'compat-std-none', code: 'CMP-STD',    name: 'Compatible · Standard',                weeks: 14,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'none' } },
+  { id: 'compat-std-mf',   code: 'CMP-STD-MF', name: 'Compatible · Standard · w/ Minifigs',  weeks: 14,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'incl' } },
+  { id: 'compat-exp-none', code: 'CMP-EXP',    name: 'Compatible · Expedited',               weeks: 8,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'none' } },
+  { id: 'compat-exp-mf',   code: 'CMP-EXP-MF', name: 'Compatible · Expedited · w/ Minifigs', weeks: 8,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'incl' } },
+  { id: 'compat-ext-none', code: 'CMP-EXT',    name: 'Compatible · Extended',                weeks: 20,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'none' } },
+  { id: 'compat-ext-mf',   code: 'CMP-EXT-MF', name: 'Compatible · Extended · w/ Minifigs',  weeks: 20,
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'incl' } },
+];
+
+const PROJECT_TYPES_BY_ID = Object.fromEntries(PROJECT_TYPES.map((p) => [p.id, p]));
+
+// Decision tree. Each non-leaf is { id, question, answers[] }.
+// Each answer.next is either another node id (continue) or { leaf: '<project-type-id>' } (terminate).
+const DECISION_TREE = {
+  'q-mfonly': {
+    id: 'q-mfonly',
+    question: 'Is this a minifig-only project?',
+    answers: [
+      { label: 'Yes', value: 'yes', next: 'q-mfonly-time' },
+      { label: 'No',  value: 'no',  next: 'q-brand' },
+    ],
+  },
+  'q-mfonly-time': {
+    id: 'q-mfonly-time',
+    question: 'What timeframe?',
+    answers: [
+      { label: 'Standard',  value: 'std', next: { leaf: 'mf-only-std' } },
+      { label: 'Expedited', value: 'exp', next: { leaf: 'mf-only-exp' } },
+      { label: 'Extended',  value: 'ext', next: { leaf: 'mf-only-ext' } },
+    ],
+  },
+  'q-brand': {
+    id: 'q-brand',
+    question: 'Which brand?',
+    answers: [
+      { label: 'LEGO',       value: 'lego',   next: 'q-time-lego' },
+      { label: 'Compatible', value: 'compat', next: 'q-time-compat' },
+    ],
+  },
+  'q-time-lego': {
+    id: 'q-time-lego',
+    question: 'What timeframe?',
+    answers: [
+      { label: 'Standard',  value: 'std', next: 'q-mf-lego-std' },
+      { label: 'Expedited', value: 'exp', next: 'q-mf-lego-exp' },
+      { label: 'Extended',  value: 'ext', next: 'q-mf-lego-ext' },
+    ],
+  },
+  'q-time-compat': {
+    id: 'q-time-compat',
+    question: 'What timeframe?',
+    answers: [
+      { label: 'Standard',  value: 'std', next: 'q-mf-compat-std' },
+      { label: 'Expedited', value: 'exp', next: 'q-mf-compat-exp' },
+      { label: 'Extended',  value: 'ext', next: 'q-mf-compat-ext' },
+    ],
+  },
+  'q-mf-lego-std':   { id: 'q-mf-lego-std',   question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'lego-std-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'lego-std-mf' } } ] },
+  'q-mf-lego-exp':   { id: 'q-mf-lego-exp',   question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'lego-exp-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'lego-exp-mf' } } ] },
+  'q-mf-lego-ext':   { id: 'q-mf-lego-ext',   question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'lego-ext-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'lego-ext-mf' } } ] },
+  'q-mf-compat-std': { id: 'q-mf-compat-std', question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'compat-std-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'compat-std-mf' } } ] },
+  'q-mf-compat-exp': { id: 'q-mf-compat-exp', question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'compat-exp-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'compat-exp-mf' } } ] },
+  'q-mf-compat-ext': { id: 'q-mf-compat-ext', question: 'Will the project include minifigs?',
+    answers: [ { label: 'No minifigs', value: 'none', next: { leaf: 'compat-ext-none' } },
+               { label: 'With minifigs', value: 'incl', next: { leaf: 'compat-ext-mf' } } ] },
+};
+
+const DECISION_TREE_ROOT = 'q-mfonly';
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
