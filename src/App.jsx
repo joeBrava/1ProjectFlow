@@ -3431,7 +3431,7 @@ function ProjectTypeFlowView({ viewId }) {
       {/* Breadcrumb strip */}
       {crumbs.length > 0 && (
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 80,
           left: 24,
           display: 'flex',
@@ -3445,7 +3445,7 @@ function ProjectTypeFlowView({ viewId }) {
           fontFamily: "'Inter', sans-serif",
           fontSize: 11,
           color: colors.textDim,
-          zIndex: 5,
+          zIndex: 100,
         }}>
           <span style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Path:</span>
           {crumbs.map((c, i) => (
@@ -3477,7 +3477,7 @@ function ProjectTypeFlowView({ viewId }) {
         <button
           onClick={reset}
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: 80,
             right: 80,
             padding: '6px 12px',
@@ -3490,7 +3490,7 @@ function ProjectTypeFlowView({ viewId }) {
             fontWeight: 600,
             cursor: 'pointer',
             backdropFilter: 'blur(4px)',
-            zIndex: 5,
+            zIndex: 100,
           }}
           title="Reset the wizard"
         >
@@ -3501,7 +3501,7 @@ function ProjectTypeFlowView({ viewId }) {
       {/* Empty-state hint */}
       {path.length === 0 && (
         <div style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 80,
           left: '50%',
           transform: 'translateX(-50%)',
@@ -3513,7 +3513,7 @@ function ProjectTypeFlowView({ viewId }) {
           fontFamily: "'Inter', sans-serif",
           fontSize: 12,
           backdropFilter: 'blur(4px)',
-          zIndex: 5,
+          zIndex: 100,
         }}>
           Answer the questions to identify the project type
         </div>
