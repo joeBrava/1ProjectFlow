@@ -3034,6 +3034,38 @@ function walkTree(tree, root, path) {
   return { kind: 'question', node: tree[root], depth: 0, chain };
 }
 
+/**
+ * Owns the wizard path (array of answer values) and persists it to localStorage.
+ * Returns { path, appendAnswer, rewindTo, reset }.
+ */
+function useProjectTypeWizard(viewId) {
+  const key = `project-type-wizard-${viewId || 'default'}`;
+  const [path, setPath] = useState(() => {
+    try {
+      const s = localStorage.getItem(key);
+      const parsed = s ? JSON.parse(s) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(path));
+  }, [key, path]);
+
+  const appendAnswer = useCallback((value) => {
+    setPath((prev) => [...prev, value]);
+  }, []);
+
+  const rewindTo = useCallback((depth) => {
+    // depth = number of answers to keep (0 = reset, 1 = keep Q1's answer, etc.)
+    setPath((prev) => prev.slice(0, depth));
+  }, []);
+
+  const reset = useCallback(() => setPath([]), []);
+
+  return { path, appendAnswer, rewindTo, reset };
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
