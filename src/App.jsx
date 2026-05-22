@@ -3283,6 +3283,93 @@ function ProjectTypeCard({ id, data }) {
   );
 }
 
+/**
+ * Build React Flow nodes + edges for the wizard, given current path.
+ * Materializes only the active path (progressive reveal).
+ *
+ *   path           — wizard path (array of answer values)
+ *   getWeeks       — (leafId, defaultWeeks) => number    (from useProjectTypeWeeks)
+ *   onAnswer       — (value) => void                     (called when user clicks an answer pill)
+ *   onRewind       — (depth) => void                     (called when user clicks an answered chip)
+ *   onWeeksChange  — (leafId, weeks) => void
+ */
+function buildProjectTypeGraph(path, { getWeeks, onAnswer, onRewind, onWeeksChange }) {
+  const COL_WIDTH = 320;
+  const Y = 0;
+  const nodes = [];
+  const edges = [];
+
+  const walk = walkTree(DECISION_TREE, DECISION_TREE_ROOT, path);
+  const { chain } = walk;
+
+  chain.forEach((step, idx) => {
+    const { node, answeredValue } = step;
+    const isActive = answeredValue === undefined;
+    const data = isActive
+      ? {
+          question: node.question,
+          step: idx + 1,
+          state: 'active',
+          answers: node.answers,
+          onAnswer,
+        }
+      : {
+          question: node.question,
+          step: idx + 1,
+          state: 'answered',
+          chosenAnswer: node.answers.find((a) => a.value === answeredValue),
+          onRewind: () => onRewind(idx),
+        };
+    nodes.push({
+      id: node.id,
+      type: 'decisionNode',
+      position: { x: idx * COL_WIDTH, y: Y },
+      data,
+      draggable: false,
+      selectable: false,
+    });
+    if (idx > 0) {
+      const prev = chain[idx - 1];
+      edges.push({
+        id: `e-${prev.node.id}-${node.id}`,
+        source: prev.node.id,
+        target: node.id,
+        style: { stroke: colors.cyan, strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: colors.cyan, width: 14, height: 14 },
+      });
+    }
+  });
+
+  if (walk.kind === 'leaf') {
+    const leaf = walk.leaf;
+    const leafNodeId = `leaf-${leaf.id}`;
+    const leafX = chain.length * COL_WIDTH;
+    nodes.push({
+      id: leafNodeId,
+      type: 'projectTypeCard',
+      position: { x: leafX, y: Y },
+      data: {
+        name: leaf.name,
+        code: leaf.code,
+        weeks: getWeeks(leaf.id, leaf.weeks),
+        onWeeksChange: (w) => onWeeksChange(leaf.id, w),
+      },
+      draggable: false,
+      selectable: false,
+    });
+    const lastDecision = chain[chain.length - 1];
+    edges.push({
+      id: `e-${lastDecision.node.id}-${leafNodeId}`,
+      source: lastDecision.node.id,
+      target: leafNodeId,
+      style: { stroke: colors.emerald, strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: colors.emerald, width: 14, height: 14 },
+    });
+  }
+
+  return { nodes, edges };
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
