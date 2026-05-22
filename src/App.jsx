@@ -3098,6 +3098,86 @@ function useProjectTypeWeeks(viewId) {
   return { getWeeks, setWeeks, resetWeeks };
 }
 
+/* ── Custom node: decision question (active or answered state) ── */
+function DecisionNode({ id, data }) {
+  // data = {
+  //   question: string, step: number, state: 'active' | 'answered',
+  //   answers?: [{label, value}],   // active state only
+  //   chosenAnswer?: {label, value},// answered state only
+  //   onAnswer?: (value) => void,   // active state only
+  //   onRewind?: () => void,        // answered state only
+  // }
+  const isActive = data.state === 'active';
+  return (
+    <div
+      style={{
+        width: 240,
+        background: colors.surface,
+        border: `1.5px solid ${isActive ? colors.cyan : colors.border}`,
+        borderRadius: 12,
+        padding: 14,
+        fontFamily: "'Inter', sans-serif",
+        color: colors.text,
+        boxShadow: isActive ? `0 0 0 3px ${colors.cyan}22` : 'none',
+        cursor: isActive ? 'default' : 'pointer',
+      }}
+      onClick={!isActive ? data.onRewind : undefined}
+      title={!isActive ? 'Click to rewind to this step' : undefined}
+    >
+      <Handle type="target" position={Position.Left} style={{ background: colors.border, width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Right} style={{ background: colors.border, width: 8, height: 8 }} />
+
+      <div style={{ fontSize: 9, fontWeight: 700, color: colors.textDim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+        Step {data.step}
+      </div>
+
+      <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, marginBottom: 10 }}>
+        {data.question}
+      </div>
+
+      {isActive ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {data.answers.map((a) => (
+            <button
+              key={a.value}
+              onClick={(e) => { e.stopPropagation(); data.onAnswer(a.value); }}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                background: colors.bg,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                color: colors.text,
+                fontSize: 12,
+                fontFamily: "'Inter', sans-serif",
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.cyan; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; }}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          padding: '6px 10px',
+          background: `${colors.cyan}22`,
+          border: `1px solid ${colors.cyan}66`,
+          borderRadius: 8,
+          color: colors.cyan,
+          fontSize: 12,
+          fontWeight: 600,
+          display: 'inline-block',
+        }}>
+          {data.chosenAnswer.label}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
