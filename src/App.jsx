@@ -3066,6 +3066,38 @@ function useProjectTypeWizard(viewId) {
   return { path, appendAnswer, rewindTo, reset };
 }
 
+/**
+ * Inline week-count overrides per project-type leaf, persisted to localStorage.
+ * Returns { getWeeks(leafId, defaultWeeks), setWeeks(leafId, weeks), resetWeeks() }.
+ */
+function useProjectTypeWeeks(viewId) {
+  const key = `project-type-weeks-${viewId || 'default'}`;
+  const [overrides, setOverrides] = useState(() => {
+    try {
+      const s = localStorage.getItem(key);
+      const parsed = s ? JSON.parse(s) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch { return {}; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(overrides));
+  }, [key, overrides]);
+
+  const getWeeks = useCallback(
+    (leafId, defaultWeeks) => (overrides[leafId] != null ? overrides[leafId] : defaultWeeks),
+    [overrides]
+  );
+
+  const setWeeks = useCallback((leafId, weeks) => {
+    setOverrides((prev) => ({ ...prev, [leafId]: weeks }));
+  }, []);
+
+  const resetWeeks = useCallback(() => setOverrides({}), []);
+
+  return { getWeeks, setWeeks, resetWeeks };
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
