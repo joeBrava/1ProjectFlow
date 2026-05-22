@@ -908,7 +908,7 @@ function WeekGrid({ data }) {
   );
 }
 
-const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar, timelinePhase: TimelinePhase, weekGrid: WeekGrid };
+const nodeTypes = { stage: StageNode, stickyNote: StickyNote, thoughtBubble: ThoughtBubble, spanBar: SpanBar, timelinePhase: TimelinePhase, weekGrid: WeekGrid, decisionNode: DecisionNode, projectTypeCard: ProjectTypeCard };
 
 /* ═══════════════════════════════════════════════════════════════════════
    EDGE DEFAULTS
@@ -3368,6 +3368,158 @@ function buildProjectTypeGraph(path, { getWeeks, onAnswer, onRewind, onWeeksChan
   }
 
   return { nodes, edges };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PROJECT TYPE FLOW VIEW — wizard rendered in React Flow
+   ═══════════════════════════════════════════════════════════════════════ */
+function ProjectTypeFlowView({ viewId }) {
+  const { path, appendAnswer, rewindTo, reset } = useProjectTypeWizard(viewId);
+  const { getWeeks, setWeeks } = useProjectTypeWeeks(viewId);
+
+  const { nodes, edges } = useMemo(
+    () => buildProjectTypeGraph(path, {
+      getWeeks,
+      onAnswer: appendAnswer,
+      onRewind: rewindTo,
+      onWeeksChange: setWeeks,
+    }),
+    [path, getWeeks, appendAnswer, rewindTo, setWeeks]
+  );
+
+  // Build breadcrumb labels from the path.
+  const crumbs = useMemo(() => {
+    const out = [];
+    let currentId = DECISION_TREE_ROOT;
+    let depth = 0;
+    while (currentId && depth < path.length) {
+      const node = DECISION_TREE[currentId];
+      const answer = node.answers.find((a) => a.value === path[depth]);
+      if (!answer) break;
+      out.push({ depth, label: answer.label });
+      if (typeof answer.next === 'string') {
+        currentId = answer.next;
+        depth += 1;
+      } else {
+        break; // leaf — no further crumbs
+      }
+    }
+    return out;
+  }, [path]);
+
+  return (
+    <>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.4 }}
+        minZoom={0.3}
+        maxZoom={1.5}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        proOptions={{ hideAttribution: true }}
+        style={{ background: colors.bg }}
+      >
+        <Background color={colors.border} gap={50} size={1} />
+        <Controls position="top-right" style={{ marginTop: 64 }} showInteractive={false} />
+        <MiniMap nodeColor={() => colors.surface} maskColor={`${colors.bg}cc`} position="bottom-right" style={{ marginBottom: 48 }} />
+      </ReactFlow>
+
+      {/* Breadcrumb strip */}
+      {crumbs.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 80,
+          left: 24,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 12px',
+          background: `${colors.surface}cc`,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 8,
+          backdropFilter: 'blur(4px)',
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 11,
+          color: colors.textDim,
+          zIndex: 5,
+        }}>
+          <span style={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Path:</span>
+          {crumbs.map((c, i) => (
+            <React.Fragment key={c.depth}>
+              {i > 0 && <span style={{ opacity: 0.4 }}>›</span>}
+              <button
+                onClick={() => rewindTo(c.depth)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '2px 4px',
+                  color: colors.text,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  fontFamily: "'Inter', sans-serif",
+                  textDecoration: 'underline dotted',
+                }}
+                title="Rewind to this step"
+              >
+                {c.label}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* Start Over button */}
+      {path.length > 0 && (
+        <button
+          onClick={reset}
+          style={{
+            position: 'absolute',
+            top: 80,
+            right: 80,
+            padding: '6px 12px',
+            background: `${colors.surface}cc`,
+            border: `1px solid ${colors.rose}66`,
+            borderRadius: 8,
+            color: colors.rose,
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
+            zIndex: 5,
+          }}
+          title="Reset the wizard"
+        >
+          ↺ Start over
+        </button>
+      )}
+
+      {/* Empty-state hint */}
+      {path.length === 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '6px 14px',
+          background: `${colors.surface}cc`,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 8,
+          color: colors.textDim,
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 12,
+          backdropFilter: 'blur(4px)',
+          zIndex: 5,
+        }}>
+          Answer the questions to identify the project type
+        </div>
+      )}
+    </>
+  );
 }
 
 const VIEW_CONFIG = {
