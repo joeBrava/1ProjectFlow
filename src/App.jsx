@@ -3537,18 +3537,26 @@ const VIEW_CONFIG = {
     title: 'Stage 2: n8n Technical Flow',
     subtitle: 'HubSpot Deal → Teamwork Project Sync (Automation A)',
   },
+  'project-types': {
+    title: 'Project Type Decision Tree',
+    subtitle: 'Classify a project into one of 15 workflow variants',
+    dropdownLabel: 'Decision Tree',
+  },
 };
 
 export default function App() {
   const [activeView, setActiveView] = useState('design-production');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const [openDropdown, setOpenDropdown] = useState(null); // 'business' | 'project-types' | null
+  const businessDropdownRef = useRef(null);
+  const projectTypesDropdownRef = useRef(null);
 
-  // Close dropdown on outside click
+  // Close any open dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
+      const insideBusiness = businessDropdownRef.current && businessDropdownRef.current.contains(e.target);
+      const insideProjectTypes = projectTypesDropdownRef.current && projectTypesDropdownRef.current.contains(e.target);
+      if (!insideBusiness && !insideProjectTypes) {
+        setOpenDropdown(null);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -3575,32 +3583,54 @@ export default function App() {
         </div>
         <div className="tab-bar">
           {/* Business Overview dropdown */}
-          <div className="dropdown-wrap" ref={dropdownRef}>
+          <div className="dropdown-wrap" ref={businessDropdownRef}>
             <button
               className={`tab-btn ${isBusiness ? 'active' : ''}`}
-              onClick={() => setDropdownOpen((p) => !p)}
+              onClick={() => setOpenDropdown((p) => (p === 'business' ? null : 'business'))}
             >
               Business Overview
               <span style={{ marginLeft: 6, fontSize: 9, opacity: 0.7 }}>▼</span>
             </button>
-            {dropdownOpen && (
+            {openDropdown === 'business' && (
               <div className="dropdown-menu">
                 <button
                   className={`dropdown-item ${activeView === 'design-production' ? 'active' : ''}`}
-                  onClick={() => { setActiveView('design-production'); setDropdownOpen(false); }}
+                  onClick={() => { setActiveView('design-production'); setOpenDropdown(null); }}
                 >
                   Design → Production
                 </button>
                 <button
                   className={`dropdown-item ${activeView === 'production' ? 'active' : ''}`}
-                  onClick={() => { setActiveView('production'); setDropdownOpen(false); }}
+                  onClick={() => { setActiveView('production'); setOpenDropdown(null); }}
                 >
                   Production
                 </button>
               </div>
             )}
           </div>
-          <button className={`tab-btn ${activeView === 'technical' ? 'active' : ''}`} onClick={() => { setActiveView('technical'); setDropdownOpen(false); }}>
+
+          {/* Project Types dropdown */}
+          <div className="dropdown-wrap" ref={projectTypesDropdownRef}>
+            <button
+              className={`tab-btn ${activeView === 'project-types' ? 'active' : ''}`}
+              onClick={() => setOpenDropdown((p) => (p === 'project-types' ? null : 'project-types'))}
+            >
+              Project Types
+              <span style={{ marginLeft: 6, fontSize: 9, opacity: 0.7 }}>▼</span>
+            </button>
+            {openDropdown === 'project-types' && (
+              <div className="dropdown-menu">
+                <button
+                  className={`dropdown-item ${activeView === 'project-types' ? 'active' : ''}`}
+                  onClick={() => { setActiveView('project-types'); setOpenDropdown(null); }}
+                >
+                  Decision Tree
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button className={`tab-btn ${activeView === 'technical' ? 'active' : ''}`} onClick={() => { setActiveView('technical'); setOpenDropdown(null); }}>
             Technical Flow
           </button>
         </div>
@@ -3630,7 +3660,7 @@ export default function App() {
             extraNodes={designThoughtBubbles}
             extraEdges={designThoughtEdges}
           />
-        ) : (
+        ) : activeView === 'production' ? (
           <FlowView
             key="production"
             viewId="production"
@@ -3643,6 +3673,8 @@ export default function App() {
             snapGridY={WEEK_HEIGHT}
             weekGrid={{ x: -550, weeks: PROD_WEEKS, rowHeight: WEEK_HEIGHT, gridWidth: 1300 }}
           />
+        ) : (
+          <ProjectTypeFlowView key="project-types" viewId="project-types" />
         )}
       </div>
 
@@ -3679,6 +3711,15 @@ export default function App() {
               <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${colors.pink}22`, color: colors.pink }}>CLIENT APPROVAL</span>
               Requires client sign-off
             </div>
+          </div>
+        </div>
+      ) : activeView === 'project-types' ? (
+        <div className="legend">
+          <div className="legend-title">Step Types</div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: colors.cyan }} />Decision node</div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: colors.emerald }} />Project Type card</div>
+          <div style={{ marginTop: 8, borderTop: `1px solid ${colors.border}`, paddingTop: 8, fontSize: 10, color: colors.textDim, lineHeight: 1.4 }}>
+            Click answers to walk the tree · Click a step to rewind
           </div>
         </div>
       ) : (
