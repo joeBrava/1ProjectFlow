@@ -2887,43 +2887,76 @@ const designThoughtEdges = [
    PROJECT TYPE DECISION TREE — static data
    ═══════════════════════════════════════════════════════════════════════ */
 
+// Master catalog of task list templates. Each project type's `taskTemplates`
+// field references these by id. `owners` and `weeks` are 'TBD' where the
+// real values haven't been decided yet.
+const TASK_TEMPLATES = {
+  'project-start':    { name: 'Project Start',       owners: 'PC',           weeks: 'Week 1'    },
+  'supplier-select':  { name: 'Supplier Selection',  owners: 'PS',           weeks: 'Week 1-2'  },
+  'mfg-order':        { name: 'Manufacturing Order', owners: 'PS',           weeks: 'Week 2'    },
+  'brick-design':     { name: 'Brick Design',        owners: 'BD, PC & PS',  weeks: 'Week 1-3'  },
+  'print-material':   { name: 'Print Material',      owners: 'PC & Design',  weeks: 'Week 1-7'  },
+  'final-production': { name: 'Final Production',    owners: 'PC & PS',      weeks: 'Week 7-10' },
+  'shipping':         { name: 'Shipping',            owners: 'PS & PC',      weeks: 'Week 10+'  },
+  'closing':          { name: 'Closing',             owners: 'PC',           weeks: ''          },
+  'minifigures':      { name: 'Minifigures',         owners: 'TBD',          weeks: 'TBD'       },
+};
+
+// Default 8-template stack for any non-minifig-only project.
+const BASE_TEMPLATES = ['project-start', 'supplier-select', 'mfg-order', 'brick-design', 'print-material', 'final-production', 'shipping', 'closing'];
+
 // 15 project type leaves. `weeks` values are placeholders; edit later via the UI.
 const PROJECT_TYPES = [
-  // Minifig-only branch (3)
+  // Minifig-only branch (3) — task templates TBD
   { id: 'mf-only-std', code: 'MF-STD', name: 'Minifig-Only · Standard',  weeks: 6,
-    axes: { minifigOnly: true, brand: null, timeframe: 'std', minifigs: null } },
+    axes: { minifigOnly: true, brand: null, timeframe: 'std', minifigs: null },
+    taskTemplates: [] },
   { id: 'mf-only-exp', code: 'MF-EXP', name: 'Minifig-Only · Expedited', weeks: 4,
-    axes: { minifigOnly: true, brand: null, timeframe: 'exp', minifigs: null } },
+    axes: { minifigOnly: true, brand: null, timeframe: 'exp', minifigs: null },
+    taskTemplates: [] },
   { id: 'mf-only-ext', code: 'MF-EXT', name: 'Minifig-Only · Extended',  weeks: 8,
-    axes: { minifigOnly: true, brand: null, timeframe: 'ext', minifigs: null } },
+    axes: { minifigOnly: true, brand: null, timeframe: 'ext', minifigs: null },
+    taskTemplates: [] },
 
   // LEGO branch (6)
   { id: 'lego-std-none', code: 'LEGO-STD',    name: 'LEGO · Standard',                weeks: 14,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'lego-std-mf',   code: 'LEGO-STD-MF', name: 'LEGO · Standard · w/ Minifigs',  weeks: 14,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'std', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
   { id: 'lego-exp-none', code: 'LEGO-EXP',    name: 'LEGO · Expedited',               weeks: 8,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'lego-exp-mf',   code: 'LEGO-EXP-MF', name: 'LEGO · Expedited · w/ Minifigs', weeks: 8,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'exp', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
   { id: 'lego-ext-none', code: 'LEGO-EXT',    name: 'LEGO · Extended',                weeks: 20,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'lego-ext-mf',   code: 'LEGO-EXT-MF', name: 'LEGO · Extended · w/ Minifigs',  weeks: 20,
-    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'lego', timeframe: 'ext', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
 
   // Compatible branch (6)
   { id: 'compat-std-none', code: 'CMP-STD',    name: 'Compatible · Standard',                weeks: 14,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'compat-std-mf',   code: 'CMP-STD-MF', name: 'Compatible · Standard · w/ Minifigs',  weeks: 14,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'std', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
   { id: 'compat-exp-none', code: 'CMP-EXP',    name: 'Compatible · Expedited',               weeks: 8,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'compat-exp-mf',   code: 'CMP-EXP-MF', name: 'Compatible · Expedited · w/ Minifigs', weeks: 8,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'exp', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
   { id: 'compat-ext-none', code: 'CMP-EXT',    name: 'Compatible · Extended',                weeks: 20,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'none' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'none' },
+    taskTemplates: BASE_TEMPLATES },
   { id: 'compat-ext-mf',   code: 'CMP-EXT-MF', name: 'Compatible · Extended · w/ Minifigs',  weeks: 20,
-    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'incl' } },
+    axes: { minifigOnly: false, brand: 'compat', timeframe: 'ext', minifigs: 'incl' },
+    taskTemplates: [...BASE_TEMPLATES, 'minifigures'] },
 ];
 
 const PROJECT_TYPES_BY_ID = Object.fromEntries(PROJECT_TYPES.map((p) => [p.id, p]));
@@ -3517,6 +3550,141 @@ function ProjectTypeFlowView({ viewId }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PROJECT TYPE GRID VIEW — all 15 cards at a glance, with task templates
+   ═══════════════════════════════════════════════════════════════════════ */
+function ProjectTypeGridView({ viewId }) {
+  const { getWeeks } = useProjectTypeWeeks(viewId);
+
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      overflow: 'auto',
+      padding: '88px 32px 32px',
+      boxSizing: 'border-box',
+      background: colors.bg,
+    }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: 16,
+        maxWidth: 1600,
+        margin: '0 auto',
+      }}>
+        {PROJECT_TYPES.map((pt) => {
+          const weeks = getWeeks(pt.id, pt.weeks);
+          const isMinifigOnly = pt.axes.minifigOnly;
+          return (
+            <div key={pt.id} style={{
+              background: colors.surface,
+              border: `2px solid ${colors.emerald}`,
+              borderRadius: 12,
+              padding: 16,
+              fontFamily: "'Inter', sans-serif",
+              color: colors.text,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              {/* Header */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: colors.emerald, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                  Project Type
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>
+                  {pt.name}
+                </div>
+              </div>
+
+              {/* Code + weeks */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{
+                  padding: '3px 8px',
+                  background: colors.bg,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 6,
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  color: colors.textDim,
+                }}>
+                  {pt.code}
+                </div>
+                <div style={{
+                  padding: '3px 8px',
+                  background: `${colors.emerald}22`,
+                  border: `1px solid ${colors.emerald}66`,
+                  borderRadius: 6,
+                  color: colors.emerald,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}>
+                  {weeks} wks
+                </div>
+              </div>
+
+              {/* Task templates */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: colors.textDim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                  Task Templates {pt.taskTemplates.length > 0 ? `(${pt.taskTemplates.length})` : ''}
+                </div>
+                {pt.taskTemplates.length === 0 ? (
+                  <div style={{
+                    fontSize: 11,
+                    color: colors.textDim,
+                    fontStyle: 'italic',
+                    padding: '6px 8px',
+                    background: colors.bg,
+                    border: `1px dashed ${colors.border}`,
+                    borderRadius: 6,
+                  }}>
+                    {isMinifigOnly ? 'Minifig-only task list — still being decided' : 'No templates assigned'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {pt.taskTemplates.map((tid) => {
+                      const t = TASK_TEMPLATES[tid];
+                      if (!t) return null;
+                      return (
+                        <div key={tid} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'baseline',
+                          gap: 8,
+                          padding: '5px 8px',
+                          background: colors.bg,
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: 6,
+                          fontSize: 11,
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+                            <span style={{ fontWeight: 600, color: colors.text }}>{t.name}</span>
+                            <span style={{ fontSize: 10, color: colors.textDim }}>{t.owners}</span>
+                          </div>
+                          {t.weeks && (
+                            <span style={{
+                              fontSize: 10,
+                              color: colors.textDim,
+                              fontFamily: 'monospace',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {t.weeks}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
@@ -3536,6 +3704,11 @@ const VIEW_CONFIG = {
     title: 'Project Type Decision Tree',
     subtitle: 'Classify a project into one of 15 workflow variants',
     dropdownLabel: 'Decision Tree',
+  },
+  'project-types-grid': {
+    title: 'Project Types — All Combinations',
+    subtitle: 'Every project-type variant with its assigned task list templates',
+    dropdownLabel: 'All Project Types',
   },
 };
 
@@ -3607,7 +3780,7 @@ export default function App() {
           {/* Project Types dropdown */}
           <div className="dropdown-wrap" ref={projectTypesDropdownRef}>
             <button
-              className={`tab-btn ${activeView === 'project-types' ? 'active' : ''}`}
+              className={`tab-btn ${(activeView === 'project-types' || activeView === 'project-types-grid') ? 'active' : ''}`}
               onClick={() => setOpenDropdown((p) => (p === 'project-types' ? null : 'project-types'))}
             >
               Project Types
@@ -3620,6 +3793,12 @@ export default function App() {
                   onClick={() => { setActiveView('project-types'); setOpenDropdown(null); }}
                 >
                   Decision Tree
+                </button>
+                <button
+                  className={`dropdown-item ${activeView === 'project-types-grid' ? 'active' : ''}`}
+                  onClick={() => { setActiveView('project-types-grid'); setOpenDropdown(null); }}
+                >
+                  All Project Types
                 </button>
               </div>
             )}
@@ -3668,6 +3847,8 @@ export default function App() {
             snapGridY={WEEK_HEIGHT}
             weekGrid={{ x: -550, weeks: PROD_WEEKS, rowHeight: WEEK_HEIGHT, gridWidth: 1300 }}
           />
+        ) : activeView === 'project-types-grid' ? (
+          <ProjectTypeGridView key="project-types-grid" viewId="project-types-grid" />
         ) : (
           <ProjectTypeFlowView key="project-types" viewId="project-types" />
         )}
@@ -3715,6 +3896,15 @@ export default function App() {
           <div className="legend-item"><div className="legend-dot" style={{ background: colors.emerald }} />Project Type card</div>
           <div style={{ marginTop: 8, borderTop: `1px solid ${colors.border}`, paddingTop: 8, fontSize: 10, color: colors.textDim, lineHeight: 1.4 }}>
             Click answers to walk the tree · Click a step to rewind
+          </div>
+        </div>
+      ) : activeView === 'project-types-grid' ? (
+        <div className="legend">
+          <div className="legend-title">Card Sections</div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: colors.emerald }} />Project Type identity</div>
+          <div className="legend-item"><div className="legend-dot" style={{ background: colors.border }} />Task list template</div>
+          <div style={{ marginTop: 8, borderTop: `1px solid ${colors.border}`, paddingTop: 8, fontSize: 10, color: colors.textDim, lineHeight: 1.4 }}>
+            Minifig-only task lists are still being decided
           </div>
         </div>
       ) : (
