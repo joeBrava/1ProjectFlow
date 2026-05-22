@@ -3178,6 +3178,111 @@ function DecisionNode({ id, data }) {
   );
 }
 
+/* ── Custom node: project type leaf card with inline-editable weeks ── */
+function ProjectTypeCard({ id, data }) {
+  // data = {
+  //   name: string, code: string, weeks: number,
+  //   onWeeksChange: (number) => void,
+  // }
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(data.weeks));
+
+  // Re-sync draft when external value changes (e.g., reset).
+  useEffect(() => { setDraft(String(data.weeks)); }, [data.weeks]);
+
+  const commit = () => {
+    const parsed = parseInt(draft, 10);
+    if (Number.isFinite(parsed) && parsed > 0 && parsed !== data.weeks) {
+      data.onWeeksChange(parsed);
+    } else {
+      setDraft(String(data.weeks));
+    }
+    setEditing(false);
+  };
+
+  return (
+    <div
+      style={{
+        width: 280,
+        background: colors.surface,
+        border: `2px solid ${colors.emerald}`,
+        borderRadius: 12,
+        padding: 16,
+        fontFamily: "'Inter', sans-serif",
+        color: colors.text,
+        boxShadow: `0 0 0 3px ${colors.emerald}22`,
+      }}
+    >
+      <Handle type="target" position={Position.Left} style={{ background: colors.emerald, width: 8, height: 8 }} />
+
+      <div style={{ fontSize: 9, fontWeight: 700, color: colors.emerald, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+        Project Type
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, marginBottom: 10 }}>
+        {data.name}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{
+          padding: '3px 8px',
+          background: colors.bg,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 6,
+          fontFamily: 'monospace',
+          fontSize: 11,
+          color: colors.textDim,
+        }}>
+          {data.code}
+        </div>
+
+        {editing ? (
+          <input
+            autoFocus
+            type="number"
+            min="1"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.currentTarget.blur(); }
+              if (e.key === 'Escape') { setDraft(String(data.weeks)); setEditing(false); }
+            }}
+            style={{
+              width: 60,
+              padding: '3px 6px',
+              background: colors.bg,
+              border: `1px solid ${colors.emerald}`,
+              borderRadius: 6,
+              color: colors.text,
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 11,
+            }}
+          />
+        ) : (
+          <button
+            onClick={() => setEditing(true)}
+            title="Click to edit"
+            style={{
+              padding: '3px 8px',
+              background: `${colors.emerald}22`,
+              border: `1px solid ${colors.emerald}66`,
+              borderRadius: 6,
+              color: colors.emerald,
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {data.weeks} wks
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const VIEW_CONFIG = {
   'design-production': {
     title: 'Design → Production Workflow',
